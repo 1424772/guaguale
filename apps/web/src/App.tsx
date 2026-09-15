@@ -556,13 +556,13 @@ function AuthScreen({ onAuthenticated }: { onAuthenticated: (user: User) => Prom
   return (
     <main className="auth-shell">
       <section className="auth-story">
-        <span className="eyebrow">PURE VIRTUAL COINS</span>
-        <h1>一张小票，<br />看清概率的长期结果。</h1>
-        <p>这是一个只使用虚拟金币的刮刮乐游戏：不能充值、不能提现、不能交易，也没有现金或实物奖励。</p>
+        <span className="eyebrow">SCRATCH CARD GAME</span>
+        <h1>欢迎来到<br />刮刮乐小游戏</h1>
+        <p>注册账号即可开始游戏。游戏仅使用虚拟金币，不支持充值、提现或交易。</p>
         <ul>
           <li>新账号获得 1,000 虚拟金币</li>
-          <li>所有开奖结果由服务端提前锁定</li>
-          <li>历史页将永久保留投入与兑奖记录</li>
+          <li>完成每日任务可获得金币和免费卡</li>
+          <li>积累金币，逐步解锁更多主题刮刮卡</li>
         </ul>
       </section>
       <section className="auth-card">
@@ -625,7 +625,7 @@ function DailyTasksDialog({
       <section className="daily-dialog" role="dialog" aria-modal="true" aria-labelledby="daily-title">
         <button className="close-button" type="button" onClick={onClose} disabled={spinning} aria-label="关闭">×</button>
         <header className="daily-header">
-          <span className="eyebrow">DAILY RECOVERY</span>
+          <span className="eyebrow">DAILY TASKS</span>
           <h1 id="daily-title">今日任务</h1>
           <p>{daily.date} · 每日零点刷新，未使用次数不累计</p>
         </header>
@@ -636,7 +636,7 @@ function DailyTasksDialog({
             <div className="task-copy">
               <span>每日登录</span>
               <h2>领取 100 金币</h2>
-              <p>每天一次，为下一轮游戏提供基础恢复资金。</p>
+              <p>每天登录一次即可领取。</p>
             </div>
             <button className="task-button" type="button" onClick={onClaimLogin} disabled={busy || daily.loginClaimed}>
               {daily.loginClaimed ? '今日已领取 ✓' : '领取奖励'}
