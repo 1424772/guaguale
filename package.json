@@ -8,10 +8,11 @@
   "scripts": {
     "dev": "npm run dev --workspace @guaguale/web",
     "build": "npm run build --workspace @guaguale/web",
-    "typecheck": "npm run typecheck --workspace @guaguale/web"
+    "typecheck": "npm run typecheck --workspace @guaguale/web",
+    "test:api": "cd apps/api && go test ./...",
+    "check": "npm run typecheck && npm run build && npm run test:api"
   },
   "engines": {
     "node": ">=22.12.0"
   }
 }
-

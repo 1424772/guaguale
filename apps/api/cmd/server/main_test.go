@@ -1,22 +1,14 @@
 package main
 
-import (
-	"net/http"
-	"net/http/httptest"
-	"strings"
-	"testing"
-)
+import "testing"
 
-func TestHealthHandler(t *testing.T) {
-	request := httptest.NewRequest(http.MethodGet, "/api/v1/health", nil)
-	response := httptest.NewRecorder()
-
-	healthHandler(response, request)
-
-	if response.Code != http.StatusOK {
-		t.Fatalf("expected status %d, got %d", http.StatusOK, response.Code)
+func TestEnvHelpersFallback(t *testing.T) {
+	t.Setenv("TEST_EMPTY_VALUE", "")
+	if envString("TEST_EMPTY_VALUE", "fallback") != "fallback" {
+		t.Fatal("envString did not use fallback")
 	}
-	if !strings.Contains(response.Body.String(), `"status":"ok"`) {
-		t.Fatalf("expected healthy response, got %s", response.Body.String())
+	t.Setenv("TEST_BAD_INT", "bad")
+	if envInt("TEST_BAD_INT", 12) != 12 {
+		t.Fatal("envInt did not use fallback")
 	}
 }

@@ -1,7 +1,7 @@
 FROM golang:1.26-alpine AS builder
 
 WORKDIR /workspace
-COPY apps/api/go.mod ./
+COPY apps/api/go.mod apps/api/go.sum ./
 RUN go mod download
 
 COPY apps/api ./
