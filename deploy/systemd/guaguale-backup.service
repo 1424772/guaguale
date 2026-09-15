@@ -1,0 +1,12 @@
+[Unit]
+Description=Guaguale MySQL backup
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/opt/guaguale
+ExecStart=/opt/guaguale/deploy/scripts/backup-mysql.sh
+

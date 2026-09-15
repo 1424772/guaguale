@@ -63,3 +63,12 @@ docker compose up -d --build
 
 启动后，Web 通过 80 端口访问，API 健康检查地址为 `/api/v1/health`。
 
+## 服务器维护
+
+服务器项目目录为 `/opt/guaguale`。更新已部署版本：
+
+```bash
+./deploy/scripts/update-server.sh
+```
+
+MySQL 每日备份由 systemd 定时器执行，默认在每天凌晨 03:20 后随机延迟最多 15 分钟运行，备份保存在 `backups/mysql`，保留 14 天。正式上线前需要将备份同步到独立的对象存储。
