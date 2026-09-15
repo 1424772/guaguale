@@ -18,6 +18,13 @@ import (
 
 const InitialBalance int64 = 1000
 
+const (
+	DailyLoginReward int64 = 100
+	PlateReward      int64 = 5
+	PlateLimit             = 5
+	PlateDuration          = 3 * time.Second
+)
+
 var (
 	ErrInvalidInput       = errors.New("invalid input")
 	ErrInvalidCredentials = errors.New("invalid username or password")
@@ -26,9 +33,9 @@ var (
 )
 
 type Service struct {
-	store        store.Store
-	now          func() time.Time
-	drawLingqian func(uint8) (domain.Outcome, error)
+	store    store.Store
+	now      func() time.Time
+	drawCard func(string, uint8) (domain.Outcome, error)
 }
 
 type AuthResult struct {
@@ -49,8 +56,21 @@ type RedeemResult struct {
 	Idempotent bool          `json:"idempotent"`
 }
 
+type DailyResult struct {
+	User       domain.User        `json:"user"`
+	Daily      domain.DailyStatus `json:"daily"`
+	Idempotent bool               `json:"idempotent"`
+}
+
+type WheelResult struct {
+	User       domain.User        `json:"user"`
+	Ticket     domain.Ticket      `json:"ticket"`
+	Daily      domain.DailyStatus `json:"daily"`
+	Idempotent bool               `json:"idempotent"`
+}
+
 func New(store store.Store) *Service {
-	return &Service{store: store, now: time.Now, drawLingqian: game.DrawLingqian}
+	return &Service{store: store, now: time.Now, drawCard: game.Draw}
 }
 
 func (service *Service) Register(ctx context.Context, username, password string, ageConfirmed bool) (AuthResult, error) {
@@ -113,7 +133,7 @@ func (service *Service) Purchase(ctx context.Context, user domain.User, cardCode
 	if !exists || !card.Implemented {
 		return PurchaseResult{}, ErrCardUnavailable
 	}
-	outcome, err := service.drawLingqian(user.LuckLevel)
+	outcome, err := service.drawCard(card.Code, user.LuckLevel)
 	if err != nil {
 		return PurchaseResult{}, err
 	}
@@ -135,6 +155,105 @@ func (service *Service) Purchase(ctx context.Context, user domain.User, cardCode
 		return PurchaseResult{}, err
 	}
 	return PurchaseResult{User: updatedUser, Ticket: ticket, Idempotent: idempotent}, nil
+}
+
+func (service *Service) DailyStatus(ctx context.Context, user domain.User) (domain.DailyStatus, error) {
+	date := shanghaiDate(service.now())
+	status, err := service.store.DailyStatus(ctx, user.ID, date)
+	if err != nil {
+		return domain.DailyStatus{}, err
+	}
+	status.Date = date
+	status.PlateLimit = PlateLimit
+	if !status.WheelUsed {
+		status.WheelPool = game.WheelPool(user.Balance)
+	}
+	return status, nil
+}
+
+func (service *Service) ClaimDailyLogin(ctx context.Context, userID uint64) (DailyResult, error) {
+	date := shanghaiDate(service.now())
+	user, daily, idempotent, err := service.store.ClaimDailyLogin(ctx, userID, date, DailyLoginReward)
+	if err != nil {
+		return DailyResult{}, err
+	}
+	daily.PlateLimit = PlateLimit
+	if !daily.WheelUsed {
+		daily.WheelPool = game.WheelPool(user.Balance)
+	}
+	return DailyResult{User: user, Daily: daily, Idempotent: idempotent}, nil
+}
+
+func (service *Service) StartPlate(ctx context.Context, user domain.User) (domain.DailyStatus, bool, error) {
+	now := service.now().UTC()
+	actionID, err := randomID()
+	if err != nil {
+		return domain.DailyStatus{}, false, err
+	}
+	date := shanghaiDate(now)
+	status, idempotent, err := service.store.StartPlate(ctx, user.ID, date, domain.PlateAction{
+		ID:          actionID,
+		State:       "started",
+		StartedAt:   now,
+		AvailableAt: now.Add(PlateDuration),
+	})
+	if err != nil {
+		return domain.DailyStatus{}, false, err
+	}
+	status.PlateLimit = PlateLimit
+	if !status.WheelUsed {
+		status.WheelPool = game.WheelPool(user.Balance)
+	}
+	return status, idempotent, nil
+}
+
+func (service *Service) CompletePlate(ctx context.Context, userID uint64, actionID string) (DailyResult, error) {
+	if !validTicketID(actionID) {
+		return DailyResult{}, ErrInvalidInput
+	}
+	now := service.now().UTC()
+	date := shanghaiDate(now)
+	user, daily, idempotent, err := service.store.CompletePlate(ctx, userID, date, actionID, now, PlateReward)
+	if err != nil {
+		return DailyResult{}, err
+	}
+	daily.PlateLimit = PlateLimit
+	if !daily.WheelUsed {
+		daily.WheelPool = game.WheelPool(user.Balance)
+	}
+	return DailyResult{User: user, Daily: daily, Idempotent: idempotent}, nil
+}
+
+func (service *Service) SpinDailyWheel(ctx context.Context, userID uint64) (WheelResult, error) {
+	ticketID, err := randomID()
+	if err != nil {
+		return WheelResult{}, err
+	}
+	date := shanghaiDate(service.now())
+	user, ticket, daily, idempotent, err := service.store.SpinDailyWheel(ctx, userID, date, ticketID, service.drawWheel)
+	if err != nil {
+		return WheelResult{}, err
+	}
+	daily.PlateLimit = PlateLimit
+	return WheelResult{User: user, Ticket: ticket, Daily: daily, Idempotent: idempotent}, nil
+}
+
+func (service *Service) drawWheel(balance int64, luckLevel uint8) (store.WheelSelection, error) {
+	card, pool, err := game.DrawWheelCard(balance)
+	if err != nil {
+		return store.WheelSelection{}, store.ErrWheelUnavailable
+	}
+	outcome, err := service.drawCard(card.Code, luckLevel)
+	if err != nil {
+		return store.WheelSelection{}, err
+	}
+	return store.WheelSelection{
+		CardCode:     card.Code,
+		CardName:     card.Name,
+		NominalPrice: card.Price,
+		Outcome:      outcome,
+		Pool:         pool,
+	}, nil
 }
 
 func (service *Service) Tickets(ctx context.Context, userID uint64) ([]domain.Ticket, error) {
@@ -210,4 +329,10 @@ func randomID() (string, error) {
 		return "", err
 	}
 	return hex.EncodeToString(raw), nil
+}
+
+var shanghaiLocation = time.FixedZone("Asia/Shanghai", 8*60*60)
+
+func shanghaiDate(value time.Time) string {
+	return value.In(shanghaiLocation).Format("2006-01-02")
 }

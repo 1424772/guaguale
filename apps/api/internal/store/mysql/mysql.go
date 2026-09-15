@@ -141,9 +141,9 @@ func (store *Store) PurchaseTicket(ctx context.Context, input basestore.CreateTi
 	}
 	_, err = tx.ExecContext(ctx, `
 		INSERT INTO tickets
-			(id, user_id, card_code, card_name, purchase_key, price, luck_level, prize_tier, reward, symbols)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		input.ID, input.UserID, input.CardCode, input.CardName, input.PurchaseKey, input.Price,
+			(id, user_id, card_code, card_name, source, purchase_key, price, price_paid, luck_level, prize_tier, reward, symbols)
+		VALUES (?, ?, ?, ?, 'purchase', ?, ?, ?, ?, ?, ?, ?)`,
+		input.ID, input.UserID, input.CardCode, input.CardName, input.PurchaseKey, input.Price, input.Price,
 		input.LuckLevel, input.Outcome.PrizeTier, input.Outcome.Reward, symbolsJSON,
 	)
 	if err != nil {
@@ -167,6 +167,8 @@ func (store *Store) PurchaseTicket(ctx context.Context, input basestore.CreateTi
 		CardCode:    input.CardCode,
 		CardName:    input.CardName,
 		Price:       input.Price,
+		PricePaid:   input.Price,
+		Source:      "purchase",
 		LuckLevel:   input.LuckLevel,
 		PrizeTier:   input.Outcome.PrizeTier,
 		Reward:      input.Outcome.Reward,
@@ -180,7 +182,8 @@ func (store *Store) PurchaseTicket(ctx context.Context, input basestore.CreateTi
 
 func (store *Store) ListTickets(ctx context.Context, userID uint64) ([]domain.Ticket, error) {
 	rows, err := store.db.QueryContext(ctx, `
-		SELECT id, user_id, card_code, card_name, purchase_key, price, luck_level,
+		SELECT id, user_id, card_code, card_name, source, purchase_key, price, price_paid,
+			COALESCE(DATE_FORMAT(wheel_date, '%Y-%m-%d'), ''), luck_level,
 			prize_tier, reward, symbols, state, created_at, scratched_at, redeemed_at
 		FROM tickets
 		WHERE user_id = ? AND state <> 'discarded'
@@ -285,6 +288,266 @@ func (store *Store) RedeemTicket(ctx context.Context, userID uint64, ticketID st
 	return user, revealTicket(ticket), false, nil
 }
 
+func (store *Store) DailyStatus(ctx context.Context, userID uint64, date string) (domain.DailyStatus, error) {
+	daily, err := dailyStatusQuery(ctx, store.db, userID, date)
+	if errors.Is(err, sql.ErrNoRows) {
+		return domain.DailyStatus{Date: date, PlateLimit: 5, WheelPool: []domain.WheelPoolItem{}}, nil
+	}
+	if err != nil {
+		return domain.DailyStatus{}, err
+	}
+	active, err := activePlateQuery(ctx, store.db, userID, date)
+	if err == nil {
+		daily.ActivePlate = &active
+	} else if !errors.Is(err, sql.ErrNoRows) {
+		return domain.DailyStatus{}, err
+	}
+	return daily, nil
+}
+
+func (store *Store) ClaimDailyLogin(ctx context.Context, userID uint64, date string, amount int64) (domain.User, domain.DailyStatus, bool, error) {
+	tx, err := store.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
+	if err != nil {
+		return domain.User{}, domain.DailyStatus{}, false, err
+	}
+	defer tx.Rollback()
+	user, err := lockedUser(ctx, tx, userID)
+	if err != nil {
+		return domain.User{}, domain.DailyStatus{}, false, err
+	}
+	if err := ensureDailyState(ctx, tx, userID, date); err != nil {
+		return domain.User{}, domain.DailyStatus{}, false, err
+	}
+	daily, err := lockedDailyStatus(ctx, tx, userID, date)
+	if err != nil {
+		return domain.User{}, domain.DailyStatus{}, false, err
+	}
+	if daily.LoginClaimed {
+		if err := tx.Commit(); err != nil {
+			return domain.User{}, domain.DailyStatus{}, false, err
+		}
+		return user, daily, true, nil
+	}
+	before := user.Balance
+	user.Balance += amount
+	if _, err := tx.ExecContext(ctx, `UPDATE users SET balance = ? WHERE id = ?`, user.Balance, userID); err != nil {
+		return domain.User{}, domain.DailyStatus{}, false, err
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE daily_user_state SET login_claimed = 1 WHERE user_id = ? AND local_date = ?`, userID, date); err != nil {
+		return domain.User{}, domain.DailyStatus{}, false, err
+	}
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO coin_ledger
+			(user_id, idempotency_key, reason, reference_type, reference_id, delta, balance_before, balance_after)
+		VALUES (?, ?, 'daily_login', 'daily', ?, ?, ?, ?)`,
+		userID, fmt.Sprintf("daily-login:%d:%s", userID, date), date, amount, before, user.Balance,
+	); err != nil {
+		return domain.User{}, domain.DailyStatus{}, false, err
+	}
+	daily.LoginClaimed = true
+	if err := tx.Commit(); err != nil {
+		return domain.User{}, domain.DailyStatus{}, false, err
+	}
+	return user, daily, false, nil
+}
+
+func (store *Store) StartPlate(ctx context.Context, userID uint64, date string, action domain.PlateAction) (domain.DailyStatus, bool, error) {
+	tx, err := store.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
+	if err != nil {
+		return domain.DailyStatus{}, false, err
+	}
+	defer tx.Rollback()
+	if _, err := lockedUser(ctx, tx, userID); err != nil {
+		return domain.DailyStatus{}, false, err
+	}
+	if err := ensureDailyState(ctx, tx, userID, date); err != nil {
+		return domain.DailyStatus{}, false, err
+	}
+	daily, err := lockedDailyStatus(ctx, tx, userID, date)
+	if err != nil {
+		return domain.DailyStatus{}, false, err
+	}
+	if daily.PlatesCompleted >= 5 {
+		return domain.DailyStatus{}, false, basestore.ErrDailyLimit
+	}
+	active, err := activePlateQuery(ctx, tx, userID, date)
+	if err == nil {
+		daily.ActivePlate = &active
+		if err := tx.Commit(); err != nil {
+			return domain.DailyStatus{}, false, err
+		}
+		return daily, true, nil
+	}
+	if !errors.Is(err, sql.ErrNoRows) {
+		return domain.DailyStatus{}, false, err
+	}
+	action.Sequence = daily.PlatesCompleted + 1
+	_, err = tx.ExecContext(ctx, `
+		INSERT INTO daily_plate_actions
+			(id, user_id, local_date, sequence_no, state, started_at, available_at)
+		VALUES (?, ?, ?, ?, 'started', ?, ?)`,
+		action.ID, userID, date, action.Sequence, action.StartedAt.UTC(), action.AvailableAt.UTC(),
+	)
+	if err != nil {
+		return domain.DailyStatus{}, false, err
+	}
+	daily.ActivePlate = &action
+	if err := tx.Commit(); err != nil {
+		return domain.DailyStatus{}, false, err
+	}
+	return daily, false, nil
+}
+
+func (store *Store) CompletePlate(ctx context.Context, userID uint64, date, actionID string, completedAt time.Time, amount int64) (domain.User, domain.DailyStatus, bool, error) {
+	tx, err := store.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
+	if err != nil {
+		return domain.User{}, domain.DailyStatus{}, false, err
+	}
+	defer tx.Rollback()
+	user, err := lockedUser(ctx, tx, userID)
+	if err != nil {
+		return domain.User{}, domain.DailyStatus{}, false, err
+	}
+	if err := ensureDailyState(ctx, tx, userID, date); err != nil {
+		return domain.User{}, domain.DailyStatus{}, false, err
+	}
+	daily, err := lockedDailyStatus(ctx, tx, userID, date)
+	if err != nil {
+		return domain.User{}, domain.DailyStatus{}, false, err
+	}
+	plate, err := lockedPlate(ctx, tx, userID, date, actionID)
+	if err != nil {
+		return domain.User{}, domain.DailyStatus{}, false, err
+	}
+	if plate.State == "completed" {
+		if err := tx.Commit(); err != nil {
+			return domain.User{}, domain.DailyStatus{}, false, err
+		}
+		return user, daily, true, nil
+	}
+	if completedAt.Before(plate.AvailableAt) {
+		return domain.User{}, domain.DailyStatus{}, false, basestore.ErrTooEarly
+	}
+	if daily.PlatesCompleted >= 5 {
+		return domain.User{}, domain.DailyStatus{}, false, basestore.ErrDailyLimit
+	}
+	before := user.Balance
+	user.Balance += amount
+	if _, err := tx.ExecContext(ctx, `UPDATE users SET balance = ? WHERE id = ?`, user.Balance, userID); err != nil {
+		return domain.User{}, domain.DailyStatus{}, false, err
+	}
+	if _, err := tx.ExecContext(ctx, `
+		UPDATE daily_plate_actions SET state = 'completed', completed_at = ? WHERE id = ?`, completedAt.UTC(), actionID,
+	); err != nil {
+		return domain.User{}, domain.DailyStatus{}, false, err
+	}
+	if _, err := tx.ExecContext(ctx, `
+		UPDATE daily_user_state SET plates_completed = plates_completed + 1 WHERE user_id = ? AND local_date = ?`, userID, date,
+	); err != nil {
+		return domain.User{}, domain.DailyStatus{}, false, err
+	}
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO coin_ledger
+			(user_id, idempotency_key, reason, reference_type, reference_id, delta, balance_before, balance_after)
+		VALUES (?, ?, 'plate_reward', 'plate', ?, ?, ?, ?)`,
+		userID, "plate:"+actionID, actionID, amount, before, user.Balance,
+	); err != nil {
+		return domain.User{}, domain.DailyStatus{}, false, err
+	}
+	daily.PlatesCompleted++
+	daily.ActivePlate = nil
+	if err := tx.Commit(); err != nil {
+		return domain.User{}, domain.DailyStatus{}, false, err
+	}
+	return user, daily, false, nil
+}
+
+func (store *Store) SpinDailyWheel(ctx context.Context, userID uint64, date, ticketID string, draw basestore.WheelDrawFunc) (domain.User, domain.Ticket, domain.DailyStatus, bool, error) {
+	tx, err := store.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
+	if err != nil {
+		return domain.User{}, domain.Ticket{}, domain.DailyStatus{}, false, err
+	}
+	defer tx.Rollback()
+	user, err := lockedUser(ctx, tx, userID)
+	if err != nil {
+		return domain.User{}, domain.Ticket{}, domain.DailyStatus{}, false, err
+	}
+	if err := ensureDailyState(ctx, tx, userID, date); err != nil {
+		return domain.User{}, domain.Ticket{}, domain.DailyStatus{}, false, err
+	}
+	daily, err := lockedDailyStatus(ctx, tx, userID, date)
+	if err != nil {
+		return domain.User{}, domain.Ticket{}, domain.DailyStatus{}, false, err
+	}
+	if daily.WheelUsed {
+		ticket, err := lockedTicket(ctx, tx, userID, daily.WheelTicketID)
+		if err != nil {
+			return domain.User{}, domain.Ticket{}, domain.DailyStatus{}, false, err
+		}
+		if err := tx.Commit(); err != nil {
+			return domain.User{}, domain.Ticket{}, domain.DailyStatus{}, false, err
+		}
+		return user, publicTicket(ticket), daily, true, nil
+	}
+	selection, err := draw(user.Balance, user.LuckLevel)
+	if err != nil {
+		return domain.User{}, domain.Ticket{}, domain.DailyStatus{}, false, err
+	}
+	symbolsJSON, err := json.Marshal(selection.Outcome.Symbols)
+	if err != nil {
+		return domain.User{}, domain.Ticket{}, domain.DailyStatus{}, false, err
+	}
+	poolJSON, err := json.Marshal(selection.Pool)
+	if err != nil {
+		return domain.User{}, domain.Ticket{}, domain.DailyStatus{}, false, err
+	}
+	_, err = tx.ExecContext(ctx, `
+		INSERT INTO tickets
+			(id, user_id, card_code, card_name, source, purchase_key, price, price_paid, wheel_date, luck_level, prize_tier, reward, symbols)
+		VALUES (?, ?, ?, ?, 'daily_wheel', ?, ?, 0, ?, ?, ?, ?, ?)`,
+		ticketID, userID, selection.CardCode, selection.CardName, "wheel:"+date,
+		selection.NominalPrice, date, user.LuckLevel, selection.Outcome.PrizeTier, selection.Outcome.Reward, symbolsJSON,
+	)
+	if err != nil {
+		return domain.User{}, domain.Ticket{}, domain.DailyStatus{}, false, err
+	}
+	_, err = tx.ExecContext(ctx, `
+		UPDATE daily_user_state
+		SET wheel_used = 1, wheel_ticket_id = ?, wheel_card_code = ?, wheel_card_name = ?, wheel_pool_snapshot = ?
+		WHERE user_id = ? AND local_date = ?`,
+		ticketID, selection.CardCode, selection.CardName, poolJSON, userID, date,
+	)
+	if err != nil {
+		return domain.User{}, domain.Ticket{}, domain.DailyStatus{}, false, err
+	}
+	now := time.Now().UTC()
+	ticket := domain.Ticket{
+		ID:        ticketID,
+		UserID:    userID,
+		CardCode:  selection.CardCode,
+		CardName:  selection.CardName,
+		Price:     selection.NominalPrice,
+		PricePaid: 0,
+		Source:    "daily_wheel",
+		WheelDate: date,
+		LuckLevel: user.LuckLevel,
+		PrizeTier: selection.Outcome.PrizeTier,
+		Reward:    selection.Outcome.Reward,
+		Symbols:   append([]string(nil), selection.Outcome.Symbols...),
+		State:     domain.TicketPurchased,
+		CreatedAt: now,
+	}
+	daily.WheelUsed = true
+	daily.WheelTicketID = ticketID
+	daily.WheelCardCode = selection.CardCode
+	daily.WheelCardName = selection.CardName
+	daily.WheelPool = append([]domain.WheelPoolItem(nil), selection.Pool...)
+	if err := tx.Commit(); err != nil {
+		return domain.User{}, domain.Ticket{}, domain.DailyStatus{}, false, err
+	}
+	return user, publicTicket(ticket), daily, false, nil
+}
+
 func (store *Store) DeleteExpiredSessions(ctx context.Context, cutoff time.Time) error {
 	_, err := store.db.ExecContext(ctx, `DELETE FROM sessions WHERE expires_at <= ?`, cutoff.UTC())
 	return err
@@ -294,13 +557,17 @@ type scanner interface {
 	Scan(...any) error
 }
 
+type queryer interface {
+	QueryRowContext(context.Context, string, ...any) *sql.Row
+}
+
 func scanTicket(row scanner) (domain.Ticket, error) {
 	var ticket domain.Ticket
 	var symbolsJSON []byte
 	var state string
 	err := row.Scan(
-		&ticket.ID, &ticket.UserID, &ticket.CardCode, &ticket.CardName, &ticket.PurchaseKey,
-		&ticket.Price, &ticket.LuckLevel, &ticket.PrizeTier, &ticket.Reward, &symbolsJSON,
+		&ticket.ID, &ticket.UserID, &ticket.CardCode, &ticket.CardName, &ticket.Source, &ticket.PurchaseKey,
+		&ticket.Price, &ticket.PricePaid, &ticket.WheelDate, &ticket.LuckLevel, &ticket.PrizeTier, &ticket.Reward, &symbolsJSON,
 		&state, &ticket.CreatedAt, &ticket.ScratchedAt, &ticket.RedeemedAt,
 	)
 	if err != nil {
@@ -327,7 +594,8 @@ func lockedUser(ctx context.Context, tx *sql.Tx, userID uint64) (domain.User, er
 
 func ticketByPurchaseKey(ctx context.Context, tx *sql.Tx, userID uint64, key string) (domain.Ticket, error) {
 	ticket, err := scanTicket(tx.QueryRowContext(ctx, `
-		SELECT id, user_id, card_code, card_name, purchase_key, price, luck_level,
+		SELECT id, user_id, card_code, card_name, source, purchase_key, price, price_paid,
+			COALESCE(DATE_FORMAT(wheel_date, '%Y-%m-%d'), ''), luck_level,
 			prize_tier, reward, symbols, state, created_at, scratched_at, redeemed_at
 		FROM tickets WHERE user_id = ? AND purchase_key = ?`, userID, key))
 	if errors.Is(err, sql.ErrNoRows) {
@@ -338,13 +606,81 @@ func ticketByPurchaseKey(ctx context.Context, tx *sql.Tx, userID uint64, key str
 
 func lockedTicket(ctx context.Context, tx *sql.Tx, userID uint64, ticketID string) (domain.Ticket, error) {
 	ticket, err := scanTicket(tx.QueryRowContext(ctx, `
-		SELECT id, user_id, card_code, card_name, purchase_key, price, luck_level,
+		SELECT id, user_id, card_code, card_name, source, purchase_key, price, price_paid,
+			COALESCE(DATE_FORMAT(wheel_date, '%Y-%m-%d'), ''), luck_level,
 			prize_tier, reward, symbols, state, created_at, scratched_at, redeemed_at
 		FROM tickets WHERE id = ? AND user_id = ? FOR UPDATE`, ticketID, userID))
 	if errors.Is(err, sql.ErrNoRows) {
 		return domain.Ticket{}, basestore.ErrNotFound
 	}
 	return ticket, err
+}
+
+func ensureDailyState(ctx context.Context, tx *sql.Tx, userID uint64, date string) error {
+	_, err := tx.ExecContext(ctx,
+		`INSERT IGNORE INTO daily_user_state (user_id, local_date) VALUES (?, ?)`, userID, date,
+	)
+	return err
+}
+
+func dailyStatusQuery(ctx context.Context, source queryer, userID uint64, date string) (domain.DailyStatus, error) {
+	return scanDailyStatus(source.QueryRowContext(ctx, `
+		SELECT DATE_FORMAT(local_date, '%Y-%m-%d'), login_claimed, plates_completed, wheel_used,
+			COALESCE(wheel_ticket_id, ''), COALESCE(wheel_card_code, ''), COALESCE(wheel_card_name, ''),
+			COALESCE(wheel_pool_snapshot, JSON_ARRAY())
+		FROM daily_user_state WHERE user_id = ? AND local_date = ?`, userID, date))
+}
+
+func lockedDailyStatus(ctx context.Context, tx *sql.Tx, userID uint64, date string) (domain.DailyStatus, error) {
+	return scanDailyStatus(tx.QueryRowContext(ctx, `
+		SELECT DATE_FORMAT(local_date, '%Y-%m-%d'), login_claimed, plates_completed, wheel_used,
+			COALESCE(wheel_ticket_id, ''), COALESCE(wheel_card_code, ''), COALESCE(wheel_card_name, ''),
+			COALESCE(wheel_pool_snapshot, JSON_ARRAY())
+		FROM daily_user_state WHERE user_id = ? AND local_date = ? FOR UPDATE`, userID, date))
+}
+
+func scanDailyStatus(row scanner) (domain.DailyStatus, error) {
+	var daily domain.DailyStatus
+	var poolJSON []byte
+	if err := row.Scan(
+		&daily.Date, &daily.LoginClaimed, &daily.PlatesCompleted, &daily.WheelUsed,
+		&daily.WheelTicketID, &daily.WheelCardCode, &daily.WheelCardName, &poolJSON,
+	); err != nil {
+		return domain.DailyStatus{}, err
+	}
+	daily.PlateLimit = 5
+	if err := json.Unmarshal(poolJSON, &daily.WheelPool); err != nil {
+		return domain.DailyStatus{}, err
+	}
+	if daily.WheelPool == nil {
+		daily.WheelPool = []domain.WheelPoolItem{}
+	}
+	return daily, nil
+}
+
+func activePlateQuery(ctx context.Context, source queryer, userID uint64, date string) (domain.PlateAction, error) {
+	return scanPlate(source.QueryRowContext(ctx, `
+		SELECT id, sequence_no, state, started_at, available_at, completed_at
+		FROM daily_plate_actions
+		WHERE user_id = ? AND local_date = ? AND state = 'started'
+		ORDER BY sequence_no LIMIT 1`, userID, date))
+}
+
+func lockedPlate(ctx context.Context, tx *sql.Tx, userID uint64, date, actionID string) (domain.PlateAction, error) {
+	plate, err := scanPlate(tx.QueryRowContext(ctx, `
+		SELECT id, sequence_no, state, started_at, available_at, completed_at
+		FROM daily_plate_actions
+		WHERE id = ? AND user_id = ? AND local_date = ? FOR UPDATE`, actionID, userID, date))
+	if errors.Is(err, sql.ErrNoRows) {
+		return domain.PlateAction{}, basestore.ErrNotFound
+	}
+	return plate, err
+}
+
+func scanPlate(row scanner) (domain.PlateAction, error) {
+	var plate domain.PlateAction
+	err := row.Scan(&plate.ID, &plate.Sequence, &plate.State, &plate.StartedAt, &plate.AvailableAt, &plate.CompletedAt)
+	return plate, err
 }
 
 func publicTicket(ticket domain.Ticket) domain.Ticket {

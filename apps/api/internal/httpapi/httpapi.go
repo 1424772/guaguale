@@ -58,6 +58,11 @@ func New(service *service.Service, store store.Store, logger *slog.Logger, cooki
 	mux.Handle("GET /api/v1/tickets", api.requireUser(http.HandlerFunc(api.tickets)))
 	mux.Handle("POST /api/v1/tickets/{id}/scratch", api.requireUser(http.HandlerFunc(api.scratch)))
 	mux.Handle("POST /api/v1/tickets/{id}/redeem", api.requireUser(http.HandlerFunc(api.redeem)))
+	mux.Handle("GET /api/v1/daily", api.requireUser(http.HandlerFunc(api.dailyStatus)))
+	mux.Handle("POST /api/v1/daily/login-claim", api.requireUser(http.HandlerFunc(api.claimDailyLogin)))
+	mux.Handle("POST /api/v1/daily/plates/start", api.requireUser(http.HandlerFunc(api.startPlate)))
+	mux.Handle("POST /api/v1/daily/plates/{id}/complete", api.requireUser(http.HandlerFunc(api.completePlate)))
+	mux.Handle("POST /api/v1/daily/wheel/spin", api.requireUser(http.HandlerFunc(api.spinDailyWheel)))
 	return api.securityHeaders(api.limitBody(mux))
 }
 
@@ -177,6 +182,51 @@ func (api *API) redeem(response http.ResponseWriter, request *http.Request) {
 	writeJSON(response, http.StatusOK, result)
 }
 
+func (api *API) dailyStatus(response http.ResponseWriter, request *http.Request) {
+	status, err := api.service.DailyStatus(request.Context(), currentUser(request))
+	if err != nil {
+		api.writeError(response, request, err)
+		return
+	}
+	writeJSON(response, http.StatusOK, map[string]any{"daily": status})
+}
+
+func (api *API) claimDailyLogin(response http.ResponseWriter, request *http.Request) {
+	result, err := api.service.ClaimDailyLogin(request.Context(), currentUser(request).ID)
+	if err != nil {
+		api.writeError(response, request, err)
+		return
+	}
+	writeJSON(response, http.StatusOK, result)
+}
+
+func (api *API) startPlate(response http.ResponseWriter, request *http.Request) {
+	daily, idempotent, err := api.service.StartPlate(request.Context(), currentUser(request))
+	if err != nil {
+		api.writeError(response, request, err)
+		return
+	}
+	writeJSON(response, http.StatusCreated, map[string]any{"daily": daily, "idempotent": idempotent})
+}
+
+func (api *API) completePlate(response http.ResponseWriter, request *http.Request) {
+	result, err := api.service.CompletePlate(request.Context(), currentUser(request).ID, request.PathValue("id"))
+	if err != nil {
+		api.writeError(response, request, err)
+		return
+	}
+	writeJSON(response, http.StatusOK, result)
+}
+
+func (api *API) spinDailyWheel(response http.ResponseWriter, request *http.Request) {
+	result, err := api.service.SpinDailyWheel(request.Context(), currentUser(request).ID)
+	if err != nil {
+		api.writeError(response, request, err)
+		return
+	}
+	writeJSON(response, http.StatusCreated, result)
+}
+
 func (api *API) requireUser(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
 		cookie, err := request.Cookie(sessionCookieName)
@@ -226,6 +276,12 @@ func (api *API) writeError(response http.ResponseWriter, request *http.Request, 
 		writeAPIError(response, http.StatusConflict, "invalid_state", "当前状态不能执行该操作")
 	case errors.Is(err, store.ErrNotWinner):
 		writeAPIError(response, http.StatusUnprocessableEntity, "not_winner", "该卡未中奖，无法兑奖")
+	case errors.Is(err, store.ErrDailyLimit):
+		writeAPIError(response, http.StatusConflict, "daily_limit", "今天的次数已经用完")
+	case errors.Is(err, store.ErrTooEarly):
+		writeAPIError(response, http.StatusTooEarly, "too_early", "操作尚未完成，请稍候")
+	case errors.Is(err, store.ErrWheelUnavailable):
+		writeAPIError(response, http.StatusConflict, "wheel_unavailable", "至少持有50金币后才能转动")
 	default:
 		api.logger.Error("request failed", "method", request.Method, "path", request.URL.Path, "error", err)
 		writeAPIError(response, http.StatusInternalServerError, "internal_error", "服务暂时不可用")

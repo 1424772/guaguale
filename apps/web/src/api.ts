@@ -20,7 +20,10 @@ export type Ticket = {
   id: string
   cardCode: string
   cardName: string
-  price: number
+  nominalPrice: number
+  pricePaid: number
+  source: 'purchase' | 'daily_wheel'
+  wheelDate?: string
   luckLevel: number
   prizeTier?: string
   reward?: number
@@ -29,6 +32,36 @@ export type Ticket = {
   createdAt: string
   scratchedAt?: string
   redeemedAt?: string
+}
+
+export type WheelPoolItem = {
+  cardCode: string
+  cardName: string
+  price: number
+  weight: number
+  basisPoint: number
+}
+
+export type PlateAction = {
+  id: string
+  sequence: number
+  state: 'started' | 'completed'
+  startedAt: string
+  availableAt: string
+  completedAt?: string
+}
+
+export type DailyStatus = {
+  date: string
+  loginClaimed: boolean
+  platesCompleted: number
+  plateLimit: number
+  activePlate?: PlateAction
+  wheelUsed: boolean
+  wheelTicketId?: string
+  wheelCardCode?: string
+  wheelCardName?: string
+  wheelPool: WheelPoolItem[]
 }
 
 type ApiErrorBody = {
@@ -93,6 +126,19 @@ export const api = {
   logout: () => request<void>('/api/v1/auth/logout', { method: 'POST' }),
   cards: () => request<{ cards: Card[] }>('/api/v1/cards'),
   tickets: () => request<{ tickets: Ticket[] }>('/api/v1/tickets'),
+  daily: () => request<{ daily: DailyStatus }>('/api/v1/daily'),
+  claimDailyLogin: () => request<{ user: User; daily: DailyStatus; idempotent: boolean }>('/api/v1/daily/login-claim', {
+    method: 'POST',
+  }),
+  startPlate: () => request<{ daily: DailyStatus; idempotent: boolean }>('/api/v1/daily/plates/start', {
+    method: 'POST',
+  }),
+  completePlate: (actionId: string) => request<{ user: User; daily: DailyStatus; idempotent: boolean }>(`/api/v1/daily/plates/${actionId}/complete`, {
+    method: 'POST',
+  }),
+  spinWheel: () => request<{ user: User; ticket: Ticket; daily: DailyStatus; idempotent: boolean }>('/api/v1/daily/wheel/spin', {
+    method: 'POST',
+  }),
   purchase: (cardCode: string, idempotencyKey: string) => request<{
     user: User
     ticket: Ticket

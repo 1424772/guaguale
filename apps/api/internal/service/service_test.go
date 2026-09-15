@@ -4,8 +4,10 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/1424772/guaguale/apps/api/internal/domain"
+	"github.com/1424772/guaguale/apps/api/internal/store"
 	"github.com/1424772/guaguale/apps/api/internal/store/memory"
 )
 
@@ -22,7 +24,7 @@ func TestAccountAndTicketLifecycle(t *testing.T) {
 		t.Fatalf("expected initial balance %d, got %d", InitialBalance, authResult.User.Balance)
 	}
 
-	service.drawLingqian = func(uint8) (domain.Outcome, error) {
+	service.drawCard = func(string, uint8) (domain.Outcome, error) {
 		return domain.Outcome{PrizeTier: "first", Reward: 100, Symbols: []string{"碎钻石", "钞票", "碎钻石"}}, nil
 	}
 	purchase, err := service.Purchase(ctx, authResult.User, "lingqian-ticket", "purchase-test-001")
@@ -66,6 +68,75 @@ func TestAccountAndTicketLifecycle(t *testing.T) {
 	}
 	if !retryRedeem.Idempotent || retryRedeem.User.Balance != result.User.Balance {
 		t.Fatal("redeem retry was not idempotent")
+	}
+}
+
+func TestDailyRecoveryLoop(t *testing.T) {
+	ctx := context.Background()
+	service := New(memory.New())
+	clock := time.Date(2026, 9, 15, 0, 30, 0, 0, time.UTC)
+	service.now = func() time.Time { return clock }
+	service.drawCard = func(string, uint8) (domain.Outcome, error) {
+		return domain.Outcome{PrizeTier: "third", Reward: 20, Symbols: []string{"狗头金币", "钞票", "狗头金币"}}, nil
+	}
+	authResult, err := service.Register(ctx, "每日玩家", "correct-horse-42", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	status, err := service.DailyStatus(ctx, authResult.User)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status.Date != "2026-09-15" || len(status.WheelPool) != 1 || status.WheelPool[0].BasisPoint != 10000 {
+		t.Fatalf("unexpected initial daily status: %#v", status)
+	}
+
+	claim, err := service.ClaimDailyLogin(ctx, authResult.User.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if claim.User.Balance != 1100 || claim.Idempotent || !claim.Daily.LoginClaimed {
+		t.Fatalf("unexpected login claim: %#v", claim)
+	}
+	retryClaim, err := service.ClaimDailyLogin(ctx, authResult.User.ID)
+	if err != nil || !retryClaim.Idempotent || retryClaim.User.Balance != 1100 {
+		t.Fatalf("login claim retry was not idempotent: %#v, %v", retryClaim, err)
+	}
+
+	started, idempotent, err := service.StartPlate(ctx, claim.User)
+	if err != nil || idempotent || started.ActivePlate == nil {
+		t.Fatalf("unexpected plate start: %#v, %v", started, err)
+	}
+	if len(started.WheelPool) == 0 {
+		t.Fatal("start plate response omitted eligible wheel pool")
+	}
+	retryStart, idempotent, err := service.StartPlate(ctx, claim.User)
+	if err != nil || !idempotent || retryStart.ActivePlate.ID != started.ActivePlate.ID {
+		t.Fatalf("plate start retry was not idempotent: %#v, %v", retryStart, err)
+	}
+	if _, err := service.CompletePlate(ctx, authResult.User.ID, started.ActivePlate.ID); !errors.Is(err, store.ErrTooEarly) {
+		t.Fatalf("expected too-early error, got %v", err)
+	}
+	clock = clock.Add(PlateDuration)
+	completed, err := service.CompletePlate(ctx, authResult.User.ID, started.ActivePlate.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if completed.User.Balance != 1105 || completed.Daily.PlatesCompleted != 1 {
+		t.Fatalf("unexpected plate completion: %#v", completed)
+	}
+
+	wheel, err := service.SpinDailyWheel(ctx, authResult.User.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if wheel.Ticket.CardCode != "lingqian-ticket" || wheel.Ticket.Source != "daily_wheel" || wheel.Ticket.PricePaid != 0 || !wheel.Daily.WheelUsed {
+		t.Fatalf("unexpected wheel result: %#v", wheel)
+	}
+	retryWheel, err := service.SpinDailyWheel(ctx, authResult.User.ID)
+	if err != nil || !retryWheel.Idempotent || retryWheel.Ticket.ID != wheel.Ticket.ID {
+		t.Fatalf("wheel retry was not idempotent: %#v, %v", retryWheel, err)
 	}
 }
 

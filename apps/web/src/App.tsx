@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react'
-import { ApiError, api, type Card, type Ticket, type User } from './api'
+import { ApiError, api, type Card, type DailyStatus, type Ticket, type User } from './api'
+import { PlateCleaning } from './PlateCleaning'
 import { ScratchCard } from './ScratchCard'
 import ticketArtwork from './assets/concepts/lingqian-ticket-play-v1.webp'
 
@@ -13,12 +14,16 @@ export function App() {
   const [user, setUser] = useState<User | null>(null)
   const [cards, setCards] = useState<Card[]>([])
   const [tickets, setTickets] = useState<Ticket[]>([])
+  const [daily, setDaily] = useState<DailyStatus | null>(null)
   const [booting, setBooting] = useState(true)
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState('')
   const [activeTicket, setActiveTicket] = useState<Ticket | null>(null)
   const [scratchRequired, setScratchRequired] = useState(false)
   const [scratchComplete, setScratchComplete] = useState(false)
+  const [dailyOpen, setDailyOpen] = useState(false)
+  const [dailyBusy, setDailyBusy] = useState(false)
+  const [wheelSpinning, setWheelSpinning] = useState(false)
 
   useEffect(() => {
     void bootstrap()
@@ -39,9 +44,10 @@ export function App() {
   }
 
   async function loadGameData() {
-    const [cardResponse, ticketResponse] = await Promise.all([api.cards(), api.tickets()])
+    const [cardResponse, ticketResponse, dailyResponse] = await Promise.all([api.cards(), api.tickets(), api.daily()])
     setCards(cardResponse.cards)
     setTickets(ticketResponse.tickets)
+    setDaily(dailyResponse.daily)
   }
 
   async function handleAuthenticated(nextUser: User) {
@@ -57,11 +63,79 @@ export function App() {
       setUser(null)
       setCards([])
       setTickets([])
+      setDaily(null)
       setActiveTicket(null)
     } catch (error) {
       setNotice(messageFrom(error))
     } finally {
       setBusy(false)
+    }
+  }
+
+  async function claimDailyLogin() {
+    if (dailyBusy) return
+    setDailyBusy(true)
+    try {
+      const result = await api.claimDailyLogin()
+      setUser(result.user)
+      setCards((current) => updateUnlocks(current, result.user.balance))
+      setDaily(result.daily)
+      setNotice(result.idempotent ? '今天的登录奖励已经领取过了' : '领取成功，获得100金币')
+    } catch (error) {
+      setNotice(messageFrom(error))
+    } finally {
+      setDailyBusy(false)
+    }
+  }
+
+  async function startPlate() {
+    if (dailyBusy) return
+    setDailyBusy(true)
+    try {
+      const result = await api.startPlate()
+      setDaily(result.daily)
+      setNotice(result.idempotent ? '继续清洗当前盘子' : `开始清洗第 ${result.daily.activePlate?.sequence ?? ''} 个盘子`)
+    } catch (error) {
+      setNotice(messageFrom(error))
+    } finally {
+      setDailyBusy(false)
+    }
+  }
+
+  async function completePlate(actionId: string) {
+    if (dailyBusy) return
+    setDailyBusy(true)
+    try {
+      const result = await api.completePlate(actionId)
+      setUser(result.user)
+      setCards((current) => updateUnlocks(current, result.user.balance))
+      setDaily(result.daily)
+      setNotice(result.idempotent ? '这个盘子已经结算' : '盘子洗好了，获得5金币')
+    } catch (error) {
+      if (!(error instanceof ApiError && error.code === 'too_early')) {
+        setNotice(messageFrom(error))
+      }
+    } finally {
+      setDailyBusy(false)
+    }
+  }
+
+  async function spinWheel() {
+    if (dailyBusy || wheelSpinning || !daily || daily.wheelUsed || daily.wheelPool.length === 0) return
+    setDailyBusy(true)
+    setWheelSpinning(true)
+    try {
+      const result = await api.spinWheel()
+      await new Promise((resolve) => window.setTimeout(resolve, 1800))
+      setUser(result.user)
+      setDaily(result.daily)
+      setTickets((current) => [result.ticket, ...current.filter((ticket) => ticket.id !== result.ticket.id)])
+      setNotice(`转盘获得《${result.ticket.cardName}》，已放到桌面`)
+    } catch (error) {
+      setNotice(messageFrom(error))
+    } finally {
+      setWheelSpinning(false)
+      setDailyBusy(false)
     }
   }
 
@@ -140,7 +214,7 @@ export function App() {
           <div><small>{user.username}</small><strong>金币 {coinFormatter.format(user.balance)}</strong></div>
         </div>
         <nav aria-label="主要功能">
-          <button type="button">今日任务</button>
+          <button type="button" onClick={() => setDailyOpen(true)}>今日任务</button>
           <button type="button">商店</button>
           <button type="button">排行榜</button>
           <button type="button" onClick={handleLogout} disabled={busy}>退出</button>
@@ -172,11 +246,11 @@ export function App() {
 
           <div className="tier-list" aria-label="后续卡片">
             {cards.filter((card) => card.code !== 'lingqian-ticket').map((card, index) => (
-              <div className="tier-row" key={card.code}>
+              <button className="tier-row" key={card.code} type="button" disabled={!card.implemented || !card.unlocked || busy} onClick={() => purchase(card)}>
                 <span className="tier-number">{index + 2}</span>
                 <div><strong>{card.name}</strong><small>{coinFormatter.format(card.price)} 金币门槛</small></div>
-                <span className={card.unlocked ? 'unlocked' : 'locked'}>{card.unlocked ? '待开放' : '未解锁'}</span>
-              </div>
+                <span className={card.unlocked ? 'unlocked' : 'locked'}>{!card.implemented ? '待开发' : card.unlocked ? '购买' : '未解锁'}</span>
+              </button>
             ))}
           </div>
         </aside>
@@ -219,9 +293,9 @@ export function App() {
           <section className="scratch-dialog" role="dialog" aria-modal="true" aria-label="刮奖">
             <button className="close-button" type="button" onClick={() => setActiveTicket(null)} aria-label="关闭">×</button>
             {scratchRequired ? (
-              <ScratchCard symbols={activeTicket.symbols ?? []} onComplete={() => setScratchComplete(true)} />
+              <ScratchCard cardName={activeTicket.cardName} symbols={activeTicket.symbols ?? []} onComplete={() => setScratchComplete(true)} />
             ) : (
-              <ResultSymbols symbols={activeTicket.symbols ?? []} />
+              <ResultSymbols cardName={activeTicket.cardName} symbols={activeTicket.symbols ?? []} />
             )}
             {scratchComplete && (
               <div className={`result-box ${activeTicket.reward ? 'winner' : 'loser'}`}>
@@ -236,6 +310,20 @@ export function App() {
             )}
           </section>
         </div>
+      )}
+
+      {dailyOpen && daily && user && (
+        <DailyTasksDialog
+          daily={daily}
+          balance={user.balance}
+          busy={dailyBusy}
+          spinning={wheelSpinning}
+          onClose={() => setDailyOpen(false)}
+          onClaimLogin={claimDailyLogin}
+          onStartPlate={startPlate}
+          onCompletePlate={completePlate}
+          onSpin={spinWheel}
+        />
       )}
     </main>
   )
@@ -302,12 +390,143 @@ function AuthScreen({ onAuthenticated }: { onAuthenticated: (user: User) => Prom
   )
 }
 
-function ResultSymbols({ symbols }: { symbols: string[] }) {
-  const emoji: Record<string, string> = { '狗头金币': '🐶', '钞票': '💵', '碎钻石': '💎', '钞票堆': '💰' }
+function DailyTasksDialog({
+  daily,
+  balance,
+  busy,
+  spinning,
+  onClose,
+  onClaimLogin,
+  onStartPlate,
+  onCompletePlate,
+  onSpin,
+}: {
+  daily: DailyStatus
+  balance: number
+  busy: boolean
+  spinning: boolean
+  onClose: () => void
+  onClaimLogin: () => void
+  onStartPlate: () => void
+  onCompletePlate: (actionId: string) => void
+  onSpin: () => void
+}) {
+  const platesDone = daily.platesCompleted >= daily.plateLimit
+  const wheelUnavailable = daily.wheelPool.length === 0
+  const wheelColors = ['#d7b45a', '#407b62', '#ae7540', '#365b78', '#76518e', '#9c4747']
+  let wheelOffset = 0
+  const wheelStops = daily.wheelPool.map((item, index) => {
+    const start = wheelOffset
+    wheelOffset += item.basisPoint / 100
+    return `${wheelColors[index % wheelColors.length]} ${start}% ${wheelOffset}%`
+  })
+  const wheelBackground = wheelStops.length > 0
+    ? `conic-gradient(from -20deg, ${wheelStops.join(', ')})`
+    : 'conic-gradient(#4b514c 0 100%)'
+
+  return (
+    <div className="modal-backdrop" role="presentation" onMouseDown={(event) => {
+      if (event.target === event.currentTarget && !spinning) onClose()
+    }}>
+      <section className="daily-dialog" role="dialog" aria-modal="true" aria-labelledby="daily-title">
+        <button className="close-button" type="button" onClick={onClose} disabled={spinning} aria-label="关闭">×</button>
+        <header className="daily-header">
+          <span className="eyebrow">DAILY RECOVERY</span>
+          <h1 id="daily-title">今日任务</h1>
+          <p>{daily.date} · 每日零点刷新，未使用次数不累计</p>
+        </header>
+
+        <div className="daily-grid">
+          <article className={`task-card ${daily.loginClaimed ? 'task-complete' : ''}`}>
+            <div className="task-icon" aria-hidden="true">☀️</div>
+            <div className="task-copy">
+              <span>每日登录</span>
+              <h2>领取 100 金币</h2>
+              <p>每天一次，为下一轮游戏提供基础恢复资金。</p>
+            </div>
+            <button className="task-button" type="button" onClick={onClaimLogin} disabled={busy || daily.loginClaimed}>
+              {daily.loginClaimed ? '今日已领取 ✓' : '领取奖励'}
+            </button>
+          </article>
+
+          <article className={`task-card ${platesDone ? 'task-complete' : ''}`}>
+            <div className="task-icon" aria-hidden="true">🍽️</div>
+            <div className="task-copy">
+              <span>洗盘子</span>
+              <h2>每个 5 金币</h2>
+              <p>每天最多洗 {daily.plateLimit} 个；按住并擦掉盘面残渣，清洁达标后结算。</p>
+              <div className="task-progress" aria-label={`已完成${daily.platesCompleted}个，共${daily.plateLimit}个`}>
+                <span style={{ width: `${(daily.platesCompleted / daily.plateLimit) * 100}%` }} />
+              </div>
+              <small>{daily.platesCompleted} / {daily.plateLimit} 已完成</small>
+            </div>
+            {daily.activePlate ? (
+              <PlateCleaning
+                actionId={daily.activePlate.id}
+                availableAt={daily.activePlate.availableAt}
+                busy={busy}
+                onComplete={onCompletePlate}
+              />
+            ) : (
+              <button className="task-button" type="button" onClick={onStartPlate} disabled={busy || platesDone}>
+                {platesDone ? '今日已完成 ✓' : `清洗第 ${daily.platesCompleted + 1} 个`}
+              </button>
+            )}
+          </article>
+        </div>
+
+        <section className="wheel-section">
+          <div className="wheel-visual" aria-label="每日免费卡转盘">
+            <div className="wheel-pointer" aria-hidden="true">▼</div>
+            <div className={`wheel-disc ${spinning ? 'wheel-spinning' : ''}`} style={{ background: wheelBackground }}>
+              <div className="wheel-hub"><span>每日</span><strong>1 次</strong></div>
+            </div>
+          </div>
+
+          <div className="wheel-copy">
+            <span className="eyebrow">FREE CARD WHEEL</span>
+            <h2>免费刮奖卡转盘</h2>
+            <p>只会抽到当前 {coinFormatter.format(balance)} 金币可购买范围内的第 1–6 款卡；第 7、8 款永不参与。</p>
+            <div className="wheel-pool">
+              {daily.wheelPool.map((item) => (
+                <div className="pool-row" key={item.cardCode}>
+                  <span>{item.cardName}<small>{coinFormatter.format(item.price)} 金币门槛</small></span>
+                  <strong>{(item.basisPoint / 100).toFixed(2)}%</strong>
+                </div>
+              ))}
+              {wheelUnavailable && <div className="pool-empty">余额不足 50 金币，先领取登录奖励即可恢复转盘资格。</div>}
+              <div className="excluded-row"><span>永恒彩钻、放手一博</span><strong>不参与</strong></div>
+            </div>
+            {daily.wheelUsed ? (
+              <div className="wheel-result"><span>今日结果</span><strong>《{daily.wheelCardName ?? '免费刮奖卡'}》</strong><small>卡片已经放到桌面</small></div>
+            ) : (
+              <button className="gold-button wheel-button" type="button" onClick={onSpin} disabled={busy || spinning || wheelUnavailable}>
+                {spinning ? '转盘转动中…' : wheelUnavailable ? '至少持有 50 金币后可转动' : '免费转动 · 今日 1/1'}
+              </button>
+            )}
+          </div>
+        </section>
+      </section>
+    </div>
+  )
+}
+
+function ResultSymbols({ cardName, symbols }: { cardName: string; symbols: string[] }) {
+  const emoji: Record<string, string> = {
+    '狗头金币': '🐶', '钞票': '💵', '碎钻石': '💎', '钞票堆': '💰',
+    '辣条': '🌶️', '可乐': '🥤', '冰棍': '🧊', '雪糕': '🍦', '玩具车': '🚗', '小电视': '📺', '游戏机': '🎮',
+    '弹珠': '🔵', '拳套': '🥊', '赛车': '🏎️', '飞机': '✈️', '街机皇冠': '👑',
+    '青晶簇': '🔷', '红晶簇': '🔶', '紫晶簇': '💜', '金色矿石': '🪨',
+    '海神王冠': '👑', '黄金宝箱': '🧰', '珍珠贝': '🦪', '生锈船锚': '⚓', '漂流瓶': '🍾', '破皮靴': '🥾', '海草团': '🌿', '空网': '🕸️',
+  }
   return (
     <div className="result-ticket">
-      <span>零钱小票</span>
-      <div>{symbols.map((symbol, index) => <strong key={`${symbol}-${index}`}>{emoji[symbol] ?? '✦'}<small>{symbol}</small></strong>)}</div>
+      <span>{cardName}</span>
+      <div className={`result-symbols count-${symbols.length}`}>{symbols.map((symbol, index) => {
+        const baseSymbol = symbol.replace(/^目标·/, '')
+        const fuelValue = symbol.match(/^燃料 (\d)$/)?.[1]
+        return <strong key={`${symbol}-${index}`}>{fuelValue ? `⛽${fuelValue}` : emoji[baseSymbol] ?? '✦'}<small>{symbol.replace('目标·', '目标：')}</small></strong>
+      })}</div>
     </div>
   )
 }

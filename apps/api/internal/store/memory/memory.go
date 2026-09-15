@@ -24,6 +24,14 @@ type Store struct {
 	sessions          map[[32]byte]domain.Session
 	tickets           map[string]domain.Ticket
 	purchaseByUserKey map[string]string
+	daily             map[string]domain.DailyStatus
+	plateActions      map[string]plateRecord
+}
+
+type plateRecord struct {
+	userID uint64
+	date   string
+	action domain.PlateAction
 }
 
 func New() *Store {
@@ -34,6 +42,8 @@ func New() *Store {
 		sessions:          make(map[[32]byte]domain.Session),
 		tickets:           make(map[string]domain.Ticket),
 		purchaseByUserKey: make(map[string]string),
+		daily:             make(map[string]domain.DailyStatus),
+		plateActions:      make(map[string]plateRecord),
 	}
 }
 
@@ -123,6 +133,8 @@ func (store *Store) PurchaseTicket(_ context.Context, input basestore.CreateTick
 		CardCode:    input.CardCode,
 		CardName:    input.CardName,
 		Price:       input.Price,
+		PricePaid:   input.Price,
+		Source:      "purchase",
 		LuckLevel:   input.LuckLevel,
 		PrizeTier:   input.Outcome.PrizeTier,
 		Reward:      input.Outcome.Reward,
@@ -134,6 +146,132 @@ func (store *Store) PurchaseTicket(_ context.Context, input basestore.CreateTick
 	store.tickets[ticket.ID] = ticket
 	store.purchaseByUserKey[key] = ticket.ID
 	return record.user, publicTicket(ticket), false, nil
+}
+
+func (store *Store) DailyStatus(_ context.Context, userID uint64, date string) (domain.DailyStatus, error) {
+	store.mu.Lock()
+	defer store.mu.Unlock()
+	if _, exists := store.users[userID]; !exists {
+		return domain.DailyStatus{}, basestore.ErrNotFound
+	}
+	return cloneDaily(store.dailyStatus(userID, date)), nil
+}
+
+func (store *Store) ClaimDailyLogin(_ context.Context, userID uint64, date string, amount int64) (domain.User, domain.DailyStatus, bool, error) {
+	store.mu.Lock()
+	defer store.mu.Unlock()
+	record, exists := store.users[userID]
+	if !exists {
+		return domain.User{}, domain.DailyStatus{}, false, basestore.ErrNotFound
+	}
+	daily := store.dailyStatus(userID, date)
+	if daily.LoginClaimed {
+		return record.user, cloneDaily(daily), true, nil
+	}
+	record.user.Balance += amount
+	store.users[userID] = record
+	daily.LoginClaimed = true
+	store.daily[dailyKey(userID, date)] = daily
+	return record.user, cloneDaily(daily), false, nil
+}
+
+func (store *Store) StartPlate(_ context.Context, userID uint64, date string, action domain.PlateAction) (domain.DailyStatus, bool, error) {
+	store.mu.Lock()
+	defer store.mu.Unlock()
+	if _, exists := store.users[userID]; !exists {
+		return domain.DailyStatus{}, false, basestore.ErrNotFound
+	}
+	daily := store.dailyStatus(userID, date)
+	if daily.PlatesCompleted >= 5 {
+		return domain.DailyStatus{}, false, basestore.ErrDailyLimit
+	}
+	if daily.ActivePlate != nil && daily.ActivePlate.State == "started" {
+		return cloneDaily(daily), true, nil
+	}
+	action.Sequence = daily.PlatesCompleted + 1
+	actionCopy := action
+	daily.ActivePlate = &actionCopy
+	store.daily[dailyKey(userID, date)] = daily
+	store.plateActions[action.ID] = plateRecord{userID: userID, date: date, action: action}
+	return cloneDaily(daily), false, nil
+}
+
+func (store *Store) CompletePlate(_ context.Context, userID uint64, date, actionID string, completedAt time.Time, amount int64) (domain.User, domain.DailyStatus, bool, error) {
+	store.mu.Lock()
+	defer store.mu.Unlock()
+	record, exists := store.users[userID]
+	if !exists {
+		return domain.User{}, domain.DailyStatus{}, false, basestore.ErrNotFound
+	}
+	plate, exists := store.plateActions[actionID]
+	if !exists || plate.userID != userID || plate.date != date {
+		return domain.User{}, domain.DailyStatus{}, false, basestore.ErrNotFound
+	}
+	daily := store.dailyStatus(userID, date)
+	if plate.action.State == "completed" {
+		return record.user, cloneDaily(daily), true, nil
+	}
+	if completedAt.Before(plate.action.AvailableAt) {
+		return domain.User{}, domain.DailyStatus{}, false, basestore.ErrTooEarly
+	}
+	if daily.PlatesCompleted >= 5 {
+		return domain.User{}, domain.DailyStatus{}, false, basestore.ErrDailyLimit
+	}
+	record.user.Balance += amount
+	store.users[userID] = record
+	plate.action.State = "completed"
+	plate.action.CompletedAt = &completedAt
+	store.plateActions[actionID] = plate
+	daily.PlatesCompleted++
+	daily.ActivePlate = nil
+	store.daily[dailyKey(userID, date)] = daily
+	return record.user, cloneDaily(daily), false, nil
+}
+
+func (store *Store) SpinDailyWheel(_ context.Context, userID uint64, date, ticketID string, draw basestore.WheelDrawFunc) (domain.User, domain.Ticket, domain.DailyStatus, bool, error) {
+	store.mu.Lock()
+	defer store.mu.Unlock()
+	record, exists := store.users[userID]
+	if !exists {
+		return domain.User{}, domain.Ticket{}, domain.DailyStatus{}, false, basestore.ErrNotFound
+	}
+	daily := store.dailyStatus(userID, date)
+	if daily.WheelUsed {
+		ticket, exists := store.tickets[daily.WheelTicketID]
+		if !exists {
+			return domain.User{}, domain.Ticket{}, domain.DailyStatus{}, false, basestore.ErrNotFound
+		}
+		return record.user, publicTicket(ticket), cloneDaily(daily), true, nil
+	}
+	selection, err := draw(record.user.Balance, record.user.LuckLevel)
+	if err != nil {
+		return domain.User{}, domain.Ticket{}, domain.DailyStatus{}, false, err
+	}
+	now := time.Now().UTC()
+	ticket := domain.Ticket{
+		ID:        ticketID,
+		UserID:    userID,
+		CardCode:  selection.CardCode,
+		CardName:  selection.CardName,
+		Price:     selection.NominalPrice,
+		PricePaid: 0,
+		Source:    "daily_wheel",
+		WheelDate: date,
+		LuckLevel: record.user.LuckLevel,
+		PrizeTier: selection.Outcome.PrizeTier,
+		Reward:    selection.Outcome.Reward,
+		Symbols:   append([]string(nil), selection.Outcome.Symbols...),
+		State:     domain.TicketPurchased,
+		CreatedAt: now,
+	}
+	store.tickets[ticket.ID] = ticket
+	daily.WheelUsed = true
+	daily.WheelTicketID = ticket.ID
+	daily.WheelCardCode = ticket.CardCode
+	daily.WheelCardName = ticket.CardName
+	daily.WheelPool = append([]domain.WheelPoolItem(nil), selection.Pool...)
+	store.daily[dailyKey(userID, date)] = daily
+	return record.user, publicTicket(ticket), cloneDaily(daily), false, nil
 }
 
 func (store *Store) ListTickets(_ context.Context, userID uint64) ([]domain.Ticket, error) {
@@ -212,6 +350,26 @@ func (store *Store) DeleteExpiredSessions(_ context.Context, cutoff time.Time) e
 
 func purchaseKey(userID uint64, key string) string {
 	return fmt.Sprintf("%d:%s", userID, key)
+}
+
+func dailyKey(userID uint64, date string) string {
+	return fmt.Sprintf("%d:%s", userID, date)
+}
+
+func (store *Store) dailyStatus(userID uint64, date string) domain.DailyStatus {
+	if daily, exists := store.daily[dailyKey(userID, date)]; exists {
+		return daily
+	}
+	return domain.DailyStatus{Date: date, PlateLimit: 5, WheelPool: []domain.WheelPoolItem{}}
+}
+
+func cloneDaily(daily domain.DailyStatus) domain.DailyStatus {
+	daily.WheelPool = append([]domain.WheelPoolItem(nil), daily.WheelPool...)
+	if daily.ActivePlate != nil {
+		copy := *daily.ActivePlate
+		daily.ActivePlate = &copy
+	}
+	return daily
 }
 
 func publicTicket(ticket domain.Ticket) domain.Ticket {
