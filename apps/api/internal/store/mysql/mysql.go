@@ -59,11 +59,12 @@ func (store *Store) CreateUser(ctx context.Context, username, passwordHash strin
 		return domain.User{}, err
 	}
 	return domain.User{
-		ID:        uint64(userID),
-		Username:  username,
-		Balance:   initialBalance,
-		LuckLevel: 0,
-		CreatedAt: time.Now().UTC(),
+		ID:           uint64(userID),
+		Username:     username,
+		Balance:      initialBalance,
+		LuckLevel:    0,
+		ScratchLevel: 1,
+		CreatedAt:    time.Now().UTC(),
 	}, nil
 }
 
@@ -71,9 +72,9 @@ func (store *Store) UserByUsername(ctx context.Context, username string) (domain
 	var user domain.User
 	var passwordHash string
 	err := store.db.QueryRowContext(ctx, `
-		SELECT id, username, password_hash, balance, luck_level, created_at
+		SELECT id, username, password_hash, balance, luck_level, scratch_level, created_at
 		FROM users WHERE username = ?`, username,
-	).Scan(&user.ID, &user.Username, &passwordHash, &user.Balance, &user.LuckLevel, &user.CreatedAt)
+	).Scan(&user.ID, &user.Username, &passwordHash, &user.Balance, &user.LuckLevel, &user.ScratchLevel, &user.CreatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return domain.User{}, "", basestore.ErrNotFound
 	}
@@ -83,11 +84,11 @@ func (store *Store) UserByUsername(ctx context.Context, username string) (domain
 func (store *Store) UserBySession(ctx context.Context, tokenHash [32]byte) (domain.User, error) {
 	var user domain.User
 	err := store.db.QueryRowContext(ctx, `
-		SELECT u.id, u.username, u.balance, u.luck_level, u.created_at
+		SELECT u.id, u.username, u.balance, u.luck_level, u.scratch_level, u.created_at
 		FROM sessions s
 		JOIN users u ON u.id = s.user_id
 		WHERE s.token_hash = ? AND s.expires_at > UTC_TIMESTAMP(6)`, tokenHash[:],
-	).Scan(&user.ID, &user.Username, &user.Balance, &user.LuckLevel, &user.CreatedAt)
+	).Scan(&user.ID, &user.Username, &user.Balance, &user.LuckLevel, &user.ScratchLevel, &user.CreatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return domain.User{}, basestore.ErrNotFound
 	}
@@ -563,6 +564,80 @@ func (store *Store) DeleteExpiredSessions(ctx context.Context, cutoff time.Time)
 	return err
 }
 
+func (store *Store) UpgradeItem(ctx context.Context, input basestore.UpgradeItemInput) (domain.User, domain.ItemUpgrade, bool, error) {
+	tx, err := store.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
+	if err != nil {
+		return domain.User{}, domain.ItemUpgrade{}, false, err
+	}
+	defer tx.Rollback()
+	user, err := lockedUser(ctx, tx, input.UserID)
+	if err != nil {
+		return domain.User{}, domain.ItemUpgrade{}, false, err
+	}
+	if existing, err := itemUpgradeByKey(ctx, tx, input.UserID, input.IdempotencyKey); err == nil {
+		if err := tx.Commit(); err != nil {
+			return domain.User{}, domain.ItemUpgrade{}, false, err
+		}
+		return user, existing, true, nil
+	} else if !errors.Is(err, basestore.ErrNotFound) {
+		return domain.User{}, domain.ItemUpgrade{}, false, err
+	}
+	currentLevel := user.LuckLevel
+	updateQuery := `UPDATE users SET balance = ?, luck_level = ? WHERE id = ?`
+	if input.ItemCode == "scratch-range" {
+		currentLevel = user.ScratchLevel
+		updateQuery = `UPDATE users SET balance = ?, scratch_level = ? WHERE id = ?`
+	} else if input.ItemCode != "luck" {
+		return domain.User{}, domain.ItemUpgrade{}, false, basestore.ErrInvalidState
+	}
+	if currentLevel != input.ExpectedFromLevel || input.ToLevel != currentLevel+1 {
+		return domain.User{}, domain.ItemUpgrade{}, false, basestore.ErrUpgradeConflict
+	}
+	if currentLevel >= input.MaxLevel || input.Price <= 0 {
+		return domain.User{}, domain.ItemUpgrade{}, false, basestore.ErrInvalidState
+	}
+	if user.Balance < input.Price {
+		return domain.User{}, domain.ItemUpgrade{}, false, basestore.ErrInsufficientFunds
+	}
+	before := user.Balance
+	user.Balance -= input.Price
+	if _, err := tx.ExecContext(ctx, updateQuery, user.Balance, input.ToLevel, user.ID); err != nil {
+		return domain.User{}, domain.ItemUpgrade{}, false, err
+	}
+	now := time.Now().UTC()
+	_, err = tx.ExecContext(ctx, `
+		INSERT INTO item_upgrades
+			(id, user_id, item_code, from_level, to_level, price, idempotency_key, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		input.ID, user.ID, input.ItemCode, currentLevel, input.ToLevel, input.Price, input.IdempotencyKey, now,
+	)
+	if err != nil {
+		return domain.User{}, domain.ItemUpgrade{}, false, err
+	}
+	_, err = tx.ExecContext(ctx, `
+		INSERT INTO coin_ledger
+			(user_id, idempotency_key, reason, reference_type, reference_id, delta, balance_before, balance_after)
+		VALUES (?, ?, 'item_upgrade', 'item_upgrade', ?, ?, ?, ?)`,
+		user.ID, "upgrade:"+input.ID, input.ID, -input.Price, before, user.Balance,
+	)
+	if err != nil {
+		return domain.User{}, domain.ItemUpgrade{}, false, err
+	}
+	if input.ItemCode == "luck" {
+		user.LuckLevel = input.ToLevel
+	} else {
+		user.ScratchLevel = input.ToLevel
+	}
+	upgrade := domain.ItemUpgrade{
+		ID: input.ID, UserID: user.ID, ItemCode: input.ItemCode, FromLevel: currentLevel,
+		ToLevel: input.ToLevel, Price: input.Price, IdempotencyKey: input.IdempotencyKey, CreatedAt: now,
+	}
+	if err := tx.Commit(); err != nil {
+		return domain.User{}, domain.ItemUpgrade{}, false, err
+	}
+	return user, upgrade, false, nil
+}
+
 func (store *Store) UpdateTicketPlacement(ctx context.Context, userID uint64, ticketID string, placement basestore.TicketPlacement) (domain.Ticket, error) {
 	tx, err := store.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
 	if err != nil {
@@ -669,13 +744,28 @@ func scanTicket(row scanner) (domain.Ticket, error) {
 func lockedUser(ctx context.Context, tx *sql.Tx, userID uint64) (domain.User, error) {
 	var user domain.User
 	err := tx.QueryRowContext(ctx, `
-		SELECT id, username, balance, luck_level, created_at
+		SELECT id, username, balance, luck_level, scratch_level, created_at
 		FROM users WHERE id = ? FOR UPDATE`, userID,
-	).Scan(&user.ID, &user.Username, &user.Balance, &user.LuckLevel, &user.CreatedAt)
+	).Scan(&user.ID, &user.Username, &user.Balance, &user.LuckLevel, &user.ScratchLevel, &user.CreatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return domain.User{}, basestore.ErrNotFound
 	}
 	return user, err
+}
+
+func itemUpgradeByKey(ctx context.Context, tx *sql.Tx, userID uint64, key string) (domain.ItemUpgrade, error) {
+	var upgrade domain.ItemUpgrade
+	err := tx.QueryRowContext(ctx, `
+		SELECT id, user_id, item_code, from_level, to_level, price, idempotency_key, created_at
+		FROM item_upgrades WHERE user_id = ? AND idempotency_key = ?`, userID, key,
+	).Scan(
+		&upgrade.ID, &upgrade.UserID, &upgrade.ItemCode, &upgrade.FromLevel, &upgrade.ToLevel,
+		&upgrade.Price, &upgrade.IdempotencyKey, &upgrade.CreatedAt,
+	)
+	if errors.Is(err, sql.ErrNoRows) {
+		return domain.ItemUpgrade{}, basestore.ErrNotFound
+	}
+	return upgrade, err
 }
 
 func ticketByPurchaseKey(ctx context.Context, tx *sql.Tx, userID uint64, key string) (domain.Ticket, error) {

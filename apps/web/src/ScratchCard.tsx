@@ -3,8 +3,11 @@ import { useEffect, useRef, useState } from 'react'
 type ScratchCardProps = {
   cardName: string
   symbols: string[]
+  scratchLevel: number
   onComplete: () => void
 }
+
+const scratchEffects = [0, 6, 8, 11, 15, 21, 29, 40, 55, 75, 100]
 
 const symbolVisuals: Record<string, { emoji: string; label: string }> = {
   '狗头金币': { emoji: '🐶', label: '狗头金币' },
@@ -37,14 +40,18 @@ const symbolVisuals: Record<string, { emoji: string; label: string }> = {
   '空网': { emoji: '🕸️', label: '空网' },
 }
 
-export function ScratchCard({ cardName, symbols, onComplete }: ScratchCardProps) {
+export function ScratchCard({ cardName, symbols, scratchLevel, onComplete }: ScratchCardProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const drawingRef = useRef(false)
   const completedRef = useRef(false)
+  const lastPointRef = useRef<{ x: number; y: number } | null>(null)
+  const moveCountRef = useRef(0)
   const [progress, setProgress] = useState(0)
   const columns = symbols.length === 9 ? 3 : symbols.length > 4 ? 4 : Math.max(symbols.length, 1)
   const rows = Math.ceil(symbols.length / columns)
   const stageHeight = rows <= 1 ? 220 : rows * 145
+  const rangePercent = scratchEffects[Math.max(1, Math.min(10, scratchLevel))]
+  const brushRadius = Math.max(6, stageHeight * rangePercent / 200)
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -80,10 +87,17 @@ export function ScratchCard({ cardName, symbols, onComplete }: ScratchCardProps)
     const bounds = canvas.getBoundingClientRect()
     const x = (event.clientX - bounds.left) * (720 / bounds.width)
     const y = (event.clientY - bounds.top) * (stageHeight / bounds.height)
+    const last = lastPointRef.current ?? { x, y }
     context.beginPath()
-    context.arc(x, y, 30, 0, Math.PI * 2)
-    context.fill()
-    if (event.timeStamp % 4 < 1) measureProgress(context, canvas)
+    context.lineCap = 'round'
+    context.lineJoin = 'round'
+    context.lineWidth = brushRadius * 2
+    context.moveTo(last.x, last.y)
+    context.lineTo(x, y)
+    context.stroke()
+    lastPointRef.current = { x, y }
+    moveCountRef.current++
+    if (moveCountRef.current % 4 === 0) measureProgress(context, canvas)
   }
 
   function measureProgress(context: CanvasRenderingContext2D, canvas: HTMLCanvasElement) {
@@ -134,19 +148,25 @@ export function ScratchCard({ cardName, symbols, onComplete }: ScratchCardProps)
           className="scratch-layer"
           onPointerDown={(event) => {
             drawingRef.current = true
+            lastPointRef.current = null
             event.currentTarget.setPointerCapture(event.pointerId)
             scratch(event)
           }}
           onPointerMove={scratch}
-          onPointerUp={() => { drawingRef.current = false }}
-          onPointerCancel={() => { drawingRef.current = false }}
+          onPointerUp={(event) => {
+            drawingRef.current = false
+            lastPointRef.current = null
+            const context = event.currentTarget.getContext('2d', { willReadFrequently: true })
+            if (context && !completedRef.current) measureProgress(context, event.currentTarget)
+          }}
+          onPointerCancel={() => { drawingRef.current = false; lastPointRef.current = null }}
           aria-label="刮奖区域"
         />
       </div>
       <div className="scratch-progress" aria-live="polite">
         <span style={{ width: `${progress}%` }} />
       </div>
-      <p>刮开45%后自动揭晓完整结果</p>
+      <p>刮片 Lv.{scratchLevel} · 单次完整划动参考覆盖 {rangePercent}% · 刮开45%后揭晓</p>
     </div>
   )
 }

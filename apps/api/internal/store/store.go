@@ -19,6 +19,7 @@ var (
 	ErrWheelUnavailable  = errors.New("wheel is unavailable")
 	ErrSlotOccupied      = errors.New("card slot is occupied")
 	ErrProtected         = errors.New("protected ticket cannot be discarded")
+	ErrUpgradeConflict   = errors.New("item level changed")
 )
 
 type CreateTicketInput struct {
@@ -51,6 +52,17 @@ type TicketPlacement struct {
 	SlotIndex *int
 }
 
+type UpgradeItemInput struct {
+	ID                string
+	UserID            uint64
+	ItemCode          string
+	ExpectedFromLevel uint8
+	ToLevel           uint8
+	MaxLevel          uint8
+	Price             int64
+	IdempotencyKey    string
+}
+
 type Store interface {
 	Ping(context.Context) error
 	CreateUser(context.Context, string, string, int64) (domain.User, error)
@@ -64,6 +76,7 @@ type Store interface {
 	RedeemTicket(context.Context, uint64, string) (domain.User, domain.Ticket, bool, error)
 	UpdateTicketPlacement(context.Context, uint64, string, TicketPlacement) (domain.Ticket, error)
 	DiscardTicket(context.Context, uint64, string, time.Time) (domain.Ticket, error)
+	UpgradeItem(context.Context, UpgradeItemInput) (domain.User, domain.ItemUpgrade, bool, error)
 	DailyStatus(context.Context, uint64, string) (domain.DailyStatus, error)
 	ClaimDailyLogin(context.Context, uint64, string, int64) (domain.User, domain.DailyStatus, bool, error)
 	StartPlate(context.Context, uint64, string, domain.PlateAction) (domain.DailyStatus, bool, error)

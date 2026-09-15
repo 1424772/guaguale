@@ -30,6 +30,7 @@ var (
 	ErrInvalidInput       = errors.New("invalid input")
 	ErrInvalidCredentials = errors.New("invalid username or password")
 	ErrCardUnavailable    = errors.New("card is not available")
+	ErrItemUnavailable    = errors.New("item is not available")
 	usernamePattern       = regexp.MustCompile(`^[\p{Han}A-Za-z0-9_]{3,32}$`)
 )
 
@@ -67,6 +68,14 @@ type WheelResult struct {
 	User       domain.User        `json:"user"`
 	Ticket     domain.Ticket      `json:"ticket"`
 	Daily      domain.DailyStatus `json:"daily"`
+	Idempotent bool               `json:"idempotent"`
+}
+
+type UpgradeResult struct {
+	User       domain.User        `json:"user"`
+	Shop       domain.ShopStatus  `json:"shop"`
+	Upgrade    domain.ItemUpgrade `json:"-"`
+	ItemCode   string             `json:"itemCode"`
 	Idempotent bool               `json:"idempotent"`
 }
 
@@ -124,6 +133,44 @@ func (service *Service) Logout(ctx context.Context, token string) error {
 
 func (service *Service) Cards(balance int64) []domain.Card {
 	return game.Catalog(balance)
+}
+
+func (service *Service) Shop(user domain.User) domain.ShopStatus {
+	return game.Shop(user.Balance, user.LuckLevel, user.ScratchLevel)
+}
+
+func (service *Service) UpgradeItem(ctx context.Context, user domain.User, itemCode, idempotencyKey string) (UpgradeResult, error) {
+	if !validIdempotencyKey(idempotencyKey) {
+		return UpgradeResult{}, ErrInvalidInput
+	}
+	currentLevel := user.LuckLevel
+	if itemCode == game.ScratchRangeItemCode {
+		currentLevel = user.ScratchLevel
+	} else if itemCode != game.LuckItemCode {
+		return UpgradeResult{}, ErrItemUnavailable
+	}
+	item, available := game.UpgradeDefinition(itemCode, currentLevel)
+	if !available {
+		return UpgradeResult{}, ErrItemUnavailable
+	}
+	upgradeID, err := randomID()
+	if err != nil {
+		return UpgradeResult{}, err
+	}
+	updatedUser, upgrade, idempotent, err := service.store.UpgradeItem(ctx, store.UpgradeItemInput{
+		ID: upgradeID, UserID: user.ID, ItemCode: itemCode, ExpectedFromLevel: currentLevel,
+		ToLevel: currentLevel + 1, MaxLevel: item.MaxLevel, Price: item.NextPrice, IdempotencyKey: idempotencyKey,
+	})
+	if err != nil {
+		if errors.Is(err, store.ErrInvalidState) && currentLevel >= item.MaxLevel {
+			return UpgradeResult{}, ErrItemUnavailable
+		}
+		return UpgradeResult{}, err
+	}
+	return UpgradeResult{
+		User: updatedUser, Shop: service.Shop(updatedUser), Upgrade: upgrade,
+		ItemCode: upgrade.ItemCode, Idempotent: idempotent,
+	}, nil
 }
 
 func (service *Service) Purchase(ctx context.Context, user domain.User, cardCode, idempotencyKey string) (PurchaseResult, error) {

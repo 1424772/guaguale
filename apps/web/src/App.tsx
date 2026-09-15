@@ -1,8 +1,9 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react'
-import { ApiError, api, type Card, type DailyStatus, type Ticket, type User } from './api'
+import { ApiError, api, type Card, type DailyStatus, type ShopItem, type ShopStatus, type Ticket, type User } from './api'
 import { DeskTicket, type DeskPlacement } from './DeskTicket'
 import { PlateCleaning } from './PlateCleaning'
 import { ScratchCard } from './ScratchCard'
+import { ShopDialog } from './ShopDialog'
 import ticketArtwork from './assets/concepts/lingqian-ticket-play-v1.webp'
 
 const coinFormatter = new Intl.NumberFormat('zh-CN')
@@ -23,6 +24,8 @@ export function App() {
   const [scratchRequired, setScratchRequired] = useState(false)
   const [scratchComplete, setScratchComplete] = useState(false)
   const [dailyOpen, setDailyOpen] = useState(false)
+  const [shopOpen, setShopOpen] = useState(false)
+  const [shop, setShop] = useState<ShopStatus | null>(null)
   const [dailyBusy, setDailyBusy] = useState(false)
   const [wheelSpinning, setWheelSpinning] = useState(false)
   const [pendingDiscard, setPendingDiscard] = useState<Ticket | null>(null)
@@ -74,6 +77,8 @@ export function App() {
       setCards([])
       setTickets([])
       setDaily(null)
+      setShop(null)
+      setShopOpen(false)
       setActiveTicket(null)
     } catch (error) {
       setNotice(messageFrom(error))
@@ -161,6 +166,45 @@ export function App() {
       setNotice('购买成功，卡片已放入购卡托盘')
     } catch (error) {
       setNotice(messageFrom(error))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function openShop() {
+    if (busy) return
+    setBusy(true)
+    try {
+      const result = await api.shop()
+      setShop(result.shop)
+      setShopOpen(true)
+    } catch (error) {
+      setNotice(messageFrom(error))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function upgradeItem(item: ShopItem) {
+    if (busy || !item.nextPrice) return
+    setBusy(true)
+    try {
+      const result = await api.upgradeItem(item.code, crypto.randomUUID())
+      setUser(result.user)
+      setCards((current) => updateUnlocks(current, result.user.balance))
+      setShop(result.shop)
+      const updated = result.shop.items.find((candidate) => candidate.code === result.itemCode)
+      setNotice(`${updated?.name ?? item.name}已升级到 ${updated?.level ?? item.level + 1} 级`)
+    } catch (error) {
+      setNotice(messageFrom(error))
+      try {
+        const [me, currentShop] = await Promise.all([api.me(), api.shop()])
+        setUser(me.user)
+        setShop(currentShop.shop)
+        setCards((current) => updateUnlocks(current, me.user.balance))
+      } catch {
+        // A later normal refresh will reconcile account state.
+      }
     } finally {
       setBusy(false)
     }
@@ -361,7 +405,7 @@ export function App() {
         </div>
         <nav aria-label="主要功能">
           <button type="button" onClick={() => setDailyOpen(true)}>今日任务</button>
-          <button type="button">商店</button>
+          <button type="button" onClick={() => void openShop()} disabled={busy}>商店</button>
           <button type="button">排行榜</button>
           <button type="button" onClick={handleLogout} disabled={busy}>退出</button>
         </nav>
@@ -482,7 +526,7 @@ export function App() {
           <section className="scratch-dialog" role="dialog" aria-modal="true" aria-label="刮奖">
             <button className="close-button" type="button" onClick={() => setActiveTicket(null)} aria-label="关闭">×</button>
             {scratchRequired ? (
-              <ScratchCard cardName={activeTicket.cardName} symbols={activeTicket.symbols ?? []} onComplete={() => setScratchComplete(true)} />
+              <ScratchCard cardName={activeTicket.cardName} symbols={activeTicket.symbols ?? []} scratchLevel={user.scratchLevel} onComplete={() => setScratchComplete(true)} />
             ) : (
               <ResultSymbols cardName={activeTicket.cardName} symbols={activeTicket.symbols ?? []} />
             )}
@@ -518,6 +562,10 @@ export function App() {
           onCompletePlate={completePlate}
           onSpin={spinWheel}
         />
+      )}
+
+      {shopOpen && shop && user && (
+        <ShopDialog user={user} shop={shop} busy={busy} onClose={() => setShopOpen(false)} onUpgrade={upgradeItem} />
       )}
     </main>
   )

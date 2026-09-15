@@ -209,3 +209,54 @@ func TestDeskPlacementSlotsAndDiscard(t *testing.T) {
 		t.Fatalf("discarded ticket remained visible: %#v", tickets)
 	}
 }
+
+func TestPermanentItemUpgrades(t *testing.T) {
+	ctx := context.Background()
+	service := New(memory.New())
+	authResult, err := service.Register(ctx, "道具玩家", "correct-horse-42", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if authResult.User.ScratchLevel != 1 || authResult.User.LuckLevel != 0 {
+		t.Fatalf("unexpected default item levels: %#v", authResult.User)
+	}
+	shop := service.Shop(authResult.User)
+	if len(shop.Items) != 2 || shop.Items[0].NextPrice != 300 || shop.Items[1].NextPrice != 100 {
+		t.Fatalf("unexpected initial shop: %#v", shop)
+	}
+
+	luck, err := service.UpgradeItem(ctx, authResult.User, "luck", "upgrade-luck-001")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if luck.User.Balance != 700 || luck.User.LuckLevel != 1 || luck.Idempotent {
+		t.Fatalf("unexpected luck upgrade: %#v", luck)
+	}
+	retry, err := service.UpgradeItem(ctx, luck.User, "luck", "upgrade-luck-001")
+	if err != nil || !retry.Idempotent || retry.User.Balance != 700 || retry.User.LuckLevel != 1 {
+		t.Fatalf("luck retry was not idempotent: %#v, %v", retry, err)
+	}
+
+	scratchUser, err := service.Register(ctx, "刮片玩家", "correct-horse-42", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	scratch, err := service.UpgradeItem(ctx, scratchUser.User, "scratch-range", "upgrade-range-001")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if scratch.User.Balance != 900 || scratch.User.ScratchLevel != 2 {
+		t.Fatalf("unexpected scratch range upgrade: %#v", scratch)
+	}
+	var usedLuck uint8
+	service.drawCard = func(_ string, level uint8) (domain.Outcome, error) {
+		usedLuck = level
+		return domain.Outcome{PrizeTier: "none", Symbols: []string{"狗头金币", "钞票", "碎钻石"}}, nil
+	}
+	if _, err := service.Purchase(ctx, luck.User, "lingqian-ticket", "luck-purchase-001"); err != nil {
+		t.Fatal(err)
+	}
+	if usedLuck != 1 {
+		t.Fatalf("purchase used luck level %d, want 1", usedLuck)
+	}
+}

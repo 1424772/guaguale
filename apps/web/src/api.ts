@@ -3,8 +3,26 @@ export type User = {
   username: string
   balance: number
   luckLevel: number
+  scratchLevel: number
   createdAt: string
 }
+
+export type ShopItem = {
+  code: 'luck' | 'scratch-range'
+  name: string
+  category: 'luck' | 'efficiency'
+  level: number
+  maxLevel: number
+  effectPercent: number
+  nextEffectPercent?: number
+  nextPrice?: number
+  totalSpent: number
+  description: string
+  notice?: string
+  relockedCards: string[]
+}
+
+export type ShopStatus = { items: ShopItem[] }
 
 export type Card = {
   code: string
@@ -132,6 +150,16 @@ export const api = {
   }),
   logout: () => request<void>('/api/v1/auth/logout', { method: 'POST' }),
   cards: () => request<{ cards: Card[] }>('/api/v1/cards'),
+  shop: () => request<{ shop: ShopStatus }>('/api/v1/shop'),
+  upgradeItem: (itemCode: string, idempotencyKey: string) => request<{
+    user: User
+    shop: ShopStatus
+    itemCode: string
+    idempotent: boolean
+  }>(`/api/v1/shop/${itemCode}/upgrade`, {
+    method: 'POST',
+    headers: { 'Idempotency-Key': idempotencyKey },
+  }),
   tickets: () => request<{ tickets: Ticket[] }>('/api/v1/tickets'),
   daily: () => request<{ daily: DailyStatus }>('/api/v1/daily'),
   claimDailyLogin: () => request<{ user: User; daily: DailyStatus; idempotent: boolean }>('/api/v1/daily/login-claim', {

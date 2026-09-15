@@ -64,6 +64,8 @@ func New(service *service.Service, store store.Store, logger *slog.Logger, cooki
 	mux.Handle("GET /api/v1/me", api.requireUser(http.HandlerFunc(api.me)))
 	mux.Handle("GET /api/v1/cards", api.requireUser(http.HandlerFunc(api.cards)))
 	mux.Handle("POST /api/v1/cards/{code}/purchase", api.requireUser(http.HandlerFunc(api.purchase)))
+	mux.Handle("GET /api/v1/shop", api.requireUser(http.HandlerFunc(api.shop)))
+	mux.Handle("POST /api/v1/shop/{code}/upgrade", api.requireUser(http.HandlerFunc(api.upgradeItem)))
 	mux.Handle("GET /api/v1/tickets", api.requireUser(http.HandlerFunc(api.tickets)))
 	mux.Handle("POST /api/v1/tickets/{id}/scratch", api.requireUser(http.HandlerFunc(api.scratch)))
 	mux.Handle("POST /api/v1/tickets/{id}/redeem", api.requireUser(http.HandlerFunc(api.redeem)))
@@ -158,6 +160,21 @@ func (api *API) purchase(response http.ResponseWriter, request *http.Request) {
 		currentUser(request),
 		request.PathValue("code"),
 		request.Header.Get("Idempotency-Key"),
+	)
+	if err != nil {
+		api.writeError(response, request, err)
+		return
+	}
+	writeJSON(response, http.StatusCreated, result)
+}
+
+func (api *API) shop(response http.ResponseWriter, request *http.Request) {
+	writeJSON(response, http.StatusOK, map[string]any{"shop": api.service.Shop(currentUser(request))})
+}
+
+func (api *API) upgradeItem(response http.ResponseWriter, request *http.Request) {
+	result, err := api.service.UpgradeItem(
+		request.Context(), currentUser(request), request.PathValue("code"), request.Header.Get("Idempotency-Key"),
 	)
 	if err != nil {
 		api.writeError(response, request, err)
@@ -307,6 +324,10 @@ func (api *API) writeError(response http.ResponseWriter, request *http.Request, 
 		writeAPIError(response, http.StatusConflict, "insufficient_funds", "金币不足")
 	case errors.Is(err, service.ErrCardUnavailable):
 		writeAPIError(response, http.StatusConflict, "card_unavailable", "该卡片暂未开放")
+	case errors.Is(err, service.ErrItemUnavailable):
+		writeAPIError(response, http.StatusConflict, "item_unavailable", "该道具已经满级或暂不可升级")
+	case errors.Is(err, store.ErrUpgradeConflict):
+		writeAPIError(response, http.StatusConflict, "upgrade_conflict", "道具等级已变化，请刷新后重试")
 	case errors.Is(err, store.ErrNotFound):
 		writeAPIError(response, http.StatusNotFound, "not_found", "没有找到对应内容")
 	case errors.Is(err, store.ErrInvalidState):

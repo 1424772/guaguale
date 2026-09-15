@@ -291,7 +291,7 @@ button { color: inherit; }
 .movable-ticket.card-rocket-launch { color: #e9f2ff; background: linear-gradient(145deg, #243866, #7089b3 58%, #192747); }
 .movable-ticket.card-deep-sea-salvage { color: #e7f6ef; background: linear-gradient(145deg, #174c58, #428e88 55%, #153d4c); }
 
-.fixed-slot-panel { position: sticky; z-index: 12; top: 84px; margin: 0 0 16px; padding: 16px; border: 1px solid #6f5b37; border-radius: 15px; background: linear-gradient(145deg, rgba(16,45,37,.98), rgba(7,26,22,.98)); box-shadow: 0 16px 28px rgba(0,0,0,.32); }
+.fixed-slot-panel { position: sticky; z-index: 1; top: 84px; margin: 0 0 16px; padding: 16px; border: 1px solid #6f5b37; border-radius: 15px; background: linear-gradient(145deg, rgba(16,45,37,.98), rgba(7,26,22,.98)); box-shadow: 0 16px 28px rgba(0,0,0,.32); }
 .fixed-slot-heading { display: flex; align-items: end; justify-content: space-between; margin-bottom: 12px; }
 .fixed-slot-heading h2 { margin: 3px 0 0; font-family: Georgia, "Songti SC", serif; }
 .fixed-slot-heading > small { color: #d9bb68; }
@@ -473,6 +473,51 @@ button { color: inherit; }
 .wheel-result span, .wheel-result small { color: #aaa58e; font-size: 12px; }
 .wheel-result strong { color: #f2d47d; font-family: Georgia, "Songti SC", serif; font-size: 23px; }
 
+.shop-backdrop { z-index: 130; }
+.shop-dialog { width: min(1120px, 94vw); max-height: 92vh; overflow: auto; border: 1px solid #957744; border-radius: 22px; color: #eee4c7; background: linear-gradient(145deg, #14372c, #071d17 72%); box-shadow: 0 38px 110px rgba(0,0,0,.68); }
+.shop-header { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 24px 78px 18px 28px; border-bottom: 1px solid rgba(218,179,83,.19); }
+.shop-header h1 { margin: 3px 0 0; font-family: Georgia, "Songti SC", serif; font-size: 30px; }
+.shop-balance { display: grid; justify-items: end; gap: 2px; }
+.shop-balance small { color: #8f9787; }
+.shop-balance strong { color: #f0cf74; font-size: 18px; }
+.shop-tabs { position: sticky; z-index: 3; top: 0; display: flex; gap: 8px; padding: 12px 28px; background: rgba(8,30,24,.96); backdrop-filter: blur(10px); }
+.shop-tabs button { min-height: 42px; padding: 8px 18px; border: 1px solid transparent; border-radius: 8px; color: #aaa997; background: transparent; font-weight: 800; cursor: pointer; }
+.shop-tabs button.active { border-color: #9f8247; color: #f2d17b; background: rgba(210,168,70,.1); }
+.shop-tabs button:disabled { opacity: .45; cursor: default; }
+.shop-layout { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(340px, .85fr); gap: 20px; padding: 8px 28px 28px; }
+.shop-items { display: grid; align-content: start; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.shop-item { min-height: 170px; display: grid; grid-template-columns: 54px 1fr; align-content: center; gap: 12px; padding: 20px; border: 1px solid #365448; border-radius: 14px; color: #e8ddbd; background: rgba(6,24,19,.52); text-align: left; cursor: pointer; transition: transform .18s, border-color .18s, background .18s; }
+.shop-item:hover, .shop-item.selected { border-color: #ae8b47; background: rgba(32,69,55,.72); transform: translateY(-2px); }
+.shop-item > div small, .shop-detail-title small { color: #9b9d8e; font-size: 10px; letter-spacing: .12em; }
+.shop-item h2 { margin: 4px 0; font-family: Georgia, "Songti SC", serif; font-size: 22px; }
+.shop-item p { margin: 0; color: #a9a794; font-size: 12px; }
+.shop-item > strong { grid-column: 2; color: #e6c76f; font-size: 13px; }
+.shop-item-icon { width: 50px; height: 50px; display: grid; place-items: center; border: 1px solid #9a8054; border-radius: 14px; color: #fff5d1; background: radial-gradient(circle at 35% 28%, #c9b7ff, #7557a3 55%, #302753); box-shadow: inset 0 0 14px rgba(255,255,255,.18); font-size: 26px; }
+.shop-item-icon.scratch-range { color: #ede3bd; background: linear-gradient(145deg, #aa884a, #3e4d43); }
+.shop-detail { min-height: 430px; padding: 24px; border: 1px solid #5e5034; border-radius: 16px; background: linear-gradient(150deg, rgba(10,37,29,.9), rgba(5,20,16,.9)); }
+.shop-detail-title { display: flex; align-items: center; gap: 14px; }
+.shop-detail-title h2 { margin: 3px 0 0; font-family: Georgia, "Songti SC", serif; font-size: 28px; }
+.shop-detail > p { color: #aaa997; line-height: 1.65; }
+.shop-note, .relock-warning { margin: 14px 0; padding: 11px 13px; border-left: 3px solid #ab8846; color: #cfc29b; background: rgba(177,137,61,.09); font-size: 12px; line-height: 1.55; }
+.relock-warning { border-color: #a36e62; color: #d4b0a7; background: rgba(139,69,58,.1); }
+.level-progress { height: 7px; margin: 20px 0; overflow: hidden; border-radius: 99px; background: rgba(255,255,255,.08); }
+.level-progress span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #94723a, #ecd077); }
+.effect-change { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 12px; }
+.effect-change > div { display: grid; gap: 5px; padding: 14px; border-radius: 10px; background: rgba(255,255,255,.045); }
+.effect-change small { color: #929586; }
+.effect-change strong { color: #f0d17c; font-size: 23px; }
+.effect-change > span { color: #8c8061; }
+.shop-costs { display: grid; gap: 7px; margin: 18px 0; }
+.shop-costs > div { display: flex; justify-content: space-between; gap: 18px; }
+.shop-costs dt { color: #8f9284; }
+.shop-costs dd { margin: 0; color: #e7d6a2; font-weight: 800; }
+.shop-upgrade { width: 100%; margin-top: 10px; }
+.upgrade-confirm { margin-top: 17px; padding: 14px; border: 1px solid #8a7041; border-radius: 12px; background: rgba(175,132,52,.08); }
+.upgrade-confirm p { margin: 0 0 12px; line-height: 1.6; }
+.upgrade-confirm > div { display: grid; grid-template-columns: 1fr 1.5fr; gap: 8px; }
+.upgrade-confirm button { width: 100%; }
+.max-level-badge { margin-top: 20px; padding: 13px; border: 1px solid #62786c; border-radius: 9px; color: #b9c6bd; text-align: center; }
+
 @media (max-width: 900px) {
   .auth-shell { grid-template-columns: 1fr; }
   .auth-story { min-height: auto; padding: 50px 26px 28px; }
@@ -481,7 +526,7 @@ button { color: inherit; }
   .auth-card { width: auto; margin: 0 20px 40px; }
   .topbar { align-items: center; }
   .topbar nav button { display: none; }
-  .topbar nav button:first-child, .topbar nav button:last-child { display: block; min-width: auto; }
+  .topbar nav button:first-child, .topbar nav button:nth-child(2), .topbar nav button:last-child { display: block; min-width: auto; }
   .desk { grid-template-columns: 1fr; padding: 26px 18px 60px; }
   .catalog-panel { order: 2; }
   .table-area { order: 1; }
@@ -493,11 +538,16 @@ button { color: inherit; }
   .wheel-section { padding: 24px 18px; }
   .wheel-visual { width: min(280px, 82vw); }
   .sink-station { min-height: 360px; padding: 72px 24px 28px; }
+  .shop-dialog { width: 100vw; max-height: 100vh; min-height: 100vh; border: 0; border-radius: 0; }
+  .shop-layout { grid-template-columns: 1fr; }
+  .shop-items { grid-template-columns: repeat(2, 1fr); }
 }
 
 @media (max-width: 520px) {
   .auth-card { padding: 25px 20px; }
   .topbar { min-height: 64px; padding: 7px 14px; }
+  .topbar nav { gap: 0; }
+  .topbar nav button { padding: 8px 7px; font-size: 12px; }
   .identity { min-width: 0; }
   .identity strong { font-size: 16px; }
   .avatar { width: 42px; height: 42px; }
@@ -539,6 +589,16 @@ button { color: inherit; }
   .wash-footer { grid-template-columns: 1fr 42px; padding: 13px 16px; }
   .wash-footer > span { grid-column: 1 / -1; text-align: center; }
   .result-ticket .count-4, .result-ticket .count-7, .result-ticket .count-8 { grid-template-columns: repeat(2, 1fr); }
+  .shop-header { padding: 18px 62px 14px 18px; }
+  .shop-header h1 { font-size: 25px; }
+  .shop-balance strong { font-size: 14px; }
+  .shop-tabs { padding: 9px 12px; overflow-x: auto; }
+  .shop-tabs button { flex: 0 0 auto; padding: 7px 12px; }
+  .shop-layout { padding: 6px 14px 24px; }
+  .shop-items { grid-template-columns: 1fr; }
+  .shop-item { min-height: 112px; padding: 14px; }
+  .shop-detail { min-height: 0; padding: 18px; }
+  .effect-change strong { font-size: 19px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

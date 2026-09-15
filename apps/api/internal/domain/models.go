@@ -3,11 +3,12 @@ package domain
 import "time"
 
 type User struct {
-	ID        uint64    `json:"id"`
-	Username  string    `json:"username"`
-	Balance   int64     `json:"balance"`
-	LuckLevel uint8     `json:"luckLevel"`
-	CreatedAt time.Time `json:"createdAt"`
+	ID           uint64    `json:"id"`
+	Username     string    `json:"username"`
+	Balance      int64     `json:"balance"`
+	LuckLevel    uint8     `json:"luckLevel"`
+	ScratchLevel uint8     `json:"scratchLevel"`
+	CreatedAt    time.Time `json:"createdAt"`
 }
 
 type Session struct {
@@ -101,4 +102,34 @@ type Outcome struct {
 	PrizeTier string
 	Reward    int64
 	Symbols   []string
+}
+
+type ShopItem struct {
+	Code              string   `json:"code"`
+	Name              string   `json:"name"`
+	Category          string   `json:"category"`
+	Level             uint8    `json:"level"`
+	MaxLevel          uint8    `json:"maxLevel"`
+	EffectPercent     int      `json:"effectPercent"`
+	NextEffectPercent int      `json:"nextEffectPercent,omitempty"`
+	NextPrice         int64    `json:"nextPrice,omitempty"`
+	TotalSpent        int64    `json:"totalSpent"`
+	Description       string   `json:"description"`
+	Notice            string   `json:"notice,omitempty"`
+	RelockedCards     []string `json:"relockedCards"`
+}
+
+type ShopStatus struct {
+	Items []ShopItem `json:"items"`
+}
+
+type ItemUpgrade struct {
+	ID             string
+	UserID         uint64
+	ItemCode       string
+	FromLevel      uint8
+	ToLevel        uint8
+	Price          int64
+	IdempotencyKey string
+	CreatedAt      time.Time
 }

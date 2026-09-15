@@ -26,6 +26,7 @@ type Store struct {
 	purchaseByUserKey map[string]string
 	daily             map[string]domain.DailyStatus
 	plateActions      map[string]plateRecord
+	upgradeByUserKey  map[string]domain.ItemUpgrade
 }
 
 type plateRecord struct {
@@ -44,6 +45,7 @@ func New() *Store {
 		purchaseByUserKey: make(map[string]string),
 		daily:             make(map[string]domain.DailyStatus),
 		plateActions:      make(map[string]plateRecord),
+		upgradeByUserKey:  make(map[string]domain.ItemUpgrade),
 	}
 }
 
@@ -56,16 +58,59 @@ func (store *Store) CreateUser(_ context.Context, username, passwordHash string,
 		return domain.User{}, basestore.ErrUsernameTaken
 	}
 	user := domain.User{
-		ID:        store.nextUserID,
-		Username:  username,
-		Balance:   initialBalance,
-		LuckLevel: 0,
-		CreatedAt: time.Now().UTC(),
+		ID:           store.nextUserID,
+		Username:     username,
+		Balance:      initialBalance,
+		LuckLevel:    0,
+		ScratchLevel: 1,
+		CreatedAt:    time.Now().UTC(),
 	}
 	store.nextUserID++
 	store.users[user.ID] = userRecord{user: user, passwordHash: passwordHash}
 	store.usernames[username] = user.ID
 	return user, nil
+}
+
+func (store *Store) UpgradeItem(_ context.Context, input basestore.UpgradeItemInput) (domain.User, domain.ItemUpgrade, bool, error) {
+	store.mu.Lock()
+	defer store.mu.Unlock()
+	record, exists := store.users[input.UserID]
+	if !exists {
+		return domain.User{}, domain.ItemUpgrade{}, false, basestore.ErrNotFound
+	}
+	key := purchaseKey(input.UserID, input.IdempotencyKey)
+	if upgrade, exists := store.upgradeByUserKey[key]; exists {
+		return record.user, upgrade, true, nil
+	}
+	currentLevel := record.user.LuckLevel
+	if input.ItemCode == "scratch-range" {
+		currentLevel = record.user.ScratchLevel
+	} else if input.ItemCode != "luck" {
+		return domain.User{}, domain.ItemUpgrade{}, false, basestore.ErrInvalidState
+	}
+	if currentLevel != input.ExpectedFromLevel || input.ToLevel != currentLevel+1 {
+		return domain.User{}, domain.ItemUpgrade{}, false, basestore.ErrUpgradeConflict
+	}
+	if currentLevel >= input.MaxLevel || input.Price <= 0 {
+		return domain.User{}, domain.ItemUpgrade{}, false, basestore.ErrInvalidState
+	}
+	if record.user.Balance < input.Price {
+		return domain.User{}, domain.ItemUpgrade{}, false, basestore.ErrInsufficientFunds
+	}
+	record.user.Balance -= input.Price
+	if input.ItemCode == "luck" {
+		record.user.LuckLevel = input.ToLevel
+	} else {
+		record.user.ScratchLevel = input.ToLevel
+	}
+	store.users[input.UserID] = record
+	upgrade := domain.ItemUpgrade{
+		ID: input.ID, UserID: input.UserID, ItemCode: input.ItemCode,
+		FromLevel: currentLevel, ToLevel: input.ToLevel, Price: input.Price,
+		IdempotencyKey: input.IdempotencyKey, CreatedAt: time.Now().UTC(),
+	}
+	store.upgradeByUserKey[key] = upgrade
+	return record.user, upgrade, false, nil
 }
 
 func (store *Store) UserByUsername(_ context.Context, username string) (domain.User, string, error) {
