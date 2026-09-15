@@ -27,12 +27,16 @@ func TestAccountAndTicketLifecycle(t *testing.T) {
 	service.drawCard = func(string, uint8) (domain.Outcome, error) {
 		return domain.Outcome{PrizeTier: "first", Reward: 100, Symbols: []string{"碎钻石", "钞票", "碎钻石"}}, nil
 	}
-	purchase, err := service.Purchase(ctx, authResult.User, "lingqian-ticket", "purchase-test-001")
+	slots, err := service.UpgradeItem(ctx, authResult.User, "card-slots", "lifecycle-slots-001")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if purchase.User.Balance != 950 {
-		t.Fatalf("expected balance 950, got %d", purchase.User.Balance)
+	purchase, err := service.Purchase(ctx, slots.User, "lingqian-ticket", "purchase-test-001")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if purchase.User.Balance != 450 {
+		t.Fatalf("expected balance 450, got %d", purchase.User.Balance)
 	}
 	if len(purchase.Ticket.Symbols) != 0 {
 		t.Fatal("purchase response exposed hidden symbols")
@@ -48,7 +52,7 @@ func TestAccountAndTicketLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !retry.Idempotent || retry.User.Balance != 950 || retry.Ticket.ID != purchase.Ticket.ID {
+	if !retry.Idempotent || retry.User.Balance != 450 || retry.Ticket.ID != purchase.Ticket.ID {
 		t.Fatalf("purchase retry was not idempotent: %#v", retry)
 	}
 
@@ -64,7 +68,7 @@ func TestAccountAndTicketLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result.User.Balance != 950+scratched.Reward {
+	if result.User.Balance != 450+scratched.Reward {
 		t.Fatalf("unexpected redeemed balance %d", result.User.Balance)
 	}
 	if result.Ticket.SlotIndex != nil {
@@ -178,6 +182,28 @@ func TestDeskPlacementSlotsAndDiscard(t *testing.T) {
 		t.Fatal(err)
 	}
 	slot := 1
+	if _, err := service.PlaceTicket(ctx, authResult.User.ID, first.Ticket.ID, store.TicketPlacement{
+		Location: domain.TicketInSlot, DeskX: .3, DeskY: .4, Rotation: -2, ZIndex: 4, SlotIndex: &slot,
+	}); !errors.Is(err, store.ErrCardSlotsRequired) {
+		t.Fatalf("expected card slots purchase requirement, got %v", err)
+	}
+	if _, err := service.DiscardTicket(ctx, authResult.User.ID, first.Ticket.ID); !errors.Is(err, store.ErrTrashRequired) {
+		t.Fatalf("expected trash purchase requirement, got %v", err)
+	}
+	trash, err := service.UpgradeItem(ctx, second.User, "trash", "buy-trash-001")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !trash.User.TrashOwned {
+		t.Fatalf("trash purchase did not update user: %#v", trash.User)
+	}
+	slots, err := service.UpgradeItem(ctx, trash.User, "card-slots", "buy-slots-001")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slots.User.CardSlotsOwned {
+		t.Fatalf("card slots purchase did not update user: %#v", slots.User)
+	}
 	placed, err := service.PlaceTicket(ctx, authResult.User.ID, first.Ticket.ID, store.TicketPlacement{
 		Location: domain.TicketInSlot, DeskX: .3, DeskY: .4, Rotation: -2, ZIndex: 4, SlotIndex: &slot,
 	})
@@ -221,7 +247,7 @@ func TestPermanentItemUpgrades(t *testing.T) {
 		t.Fatalf("unexpected default item levels: %#v", authResult.User)
 	}
 	shop := service.Shop(authResult.User)
-	if len(shop.Items) != 2 || shop.Items[0].NextPrice != 300 || shop.Items[1].NextPrice != 100 {
+	if len(shop.Items) != 4 || shop.Items[0].NextPrice != 300 || shop.Items[1].NextPrice != 100 || shop.Items[2].NextPrice != 100 || shop.Items[3].NextPrice != 500 {
 		t.Fatalf("unexpected initial shop: %#v", shop)
 	}
 
@@ -258,5 +284,14 @@ func TestPermanentItemUpgrades(t *testing.T) {
 	}
 	if usedLuck != 1 {
 		t.Fatalf("purchase used luck level %d, want 1", usedLuck)
+	}
+
+	trash, err := service.UpgradeItem(ctx, luck.User, "trash", "upgrade-trash-001")
+	if err != nil || !trash.User.TrashOwned || trash.User.Balance != 550 {
+		t.Fatalf("unexpected trash purchase: %#v, %v", trash, err)
+	}
+	slots, err := service.UpgradeItem(ctx, trash.User, "card-slots", "upgrade-slots-001")
+	if err != nil || !slots.User.CardSlotsOwned || slots.User.Balance != 50 {
+		t.Fatalf("unexpected card slots purchase: %#v, %v", slots, err)
 	}
 }

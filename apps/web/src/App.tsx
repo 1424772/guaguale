@@ -25,6 +25,7 @@ export function App() {
   const [scratchComplete, setScratchComplete] = useState(false)
   const [dailyOpen, setDailyOpen] = useState(false)
   const [shopOpen, setShopOpen] = useState(false)
+  const [shopFocus, setShopFocus] = useState<ShopItem['code']>('luck')
   const [shop, setShop] = useState<ShopStatus | null>(null)
   const [dailyBusy, setDailyBusy] = useState(false)
   const [wheelSpinning, setWheelSpinning] = useState(false)
@@ -171,12 +172,13 @@ export function App() {
     }
   }
 
-  async function openShop() {
+  async function openShop(focus: ShopItem['code'] = 'luck') {
     if (busy) return
     setBusy(true)
     try {
       const result = await api.shop()
       setShop(result.shop)
+      setShopFocus(focus)
       setShopOpen(true)
     } catch (error) {
       setNotice(messageFrom(error))
@@ -194,7 +196,7 @@ export function App() {
       setCards((current) => updateUnlocks(current, result.user.balance))
       setShop(result.shop)
       const updated = result.shop.items.find((candidate) => candidate.code === result.itemCode)
-      setNotice(`${updated?.name ?? item.name}已升级到 ${updated?.level ?? item.level + 1} 级`)
+      setNotice(item.maxLevel === 1 ? `${updated?.name ?? item.name}购买成功，已永久开放` : `${updated?.name ?? item.name}已升级到 ${updated?.level ?? item.level + 1} 级`)
     } catch (error) {
       setNotice(messageFrom(error))
       try {
@@ -302,6 +304,11 @@ export function App() {
   }
 
   function pinToFirstSlot(ticket: Ticket) {
+    if (!user?.cardSlotsOwned) {
+      setNotice('请先购买固定卡槽，购买后永久开放10个卡位')
+      void openShop('card-slots')
+      return
+    }
     const occupied = new Set(tickets.flatMap((item) => item.slotIndex ? [item.slotIndex] : []))
     const firstFree = Array.from({ length: 10 }, (_, index) => index + 1).find((index) => !occupied.has(index))
     if (!firstFree) {
@@ -329,6 +336,11 @@ export function App() {
   function handleTicketDrop(ticket: Ticket, point: { x: number; y: number }, placement: DeskPlacement) {
     const slotIndex = slotRefs.current.findIndex((slot) => pointInside(slot, point))
     if (slotIndex >= 0) {
+      if (!user?.cardSlotsOwned) {
+        setNotice('固定卡槽尚未购买')
+        void updateTicketPlacement(ticket, { ...placement, location: 'desk' })
+        return
+      }
       void updateTicketPlacement(ticket, { ...placement, location: 'slot', slotIndex: slotIndex + 1 })
       setNotice(`《${ticket.cardName}》已放入固定卡槽 ${slotIndex + 1}`)
       return
@@ -346,6 +358,11 @@ export function App() {
       return
     }
     if (pointInside(trashZoneRef.current, point)) {
+      if (!user?.trashOwned) {
+        setNotice('请先购买垃圾桶，才能丢弃桌面卡片')
+        void updateTicketPlacement(ticket, { ...placement, location: 'desk' })
+        return
+      }
       queueDiscard(ticket)
       return
     }
@@ -405,7 +422,7 @@ export function App() {
         </div>
         <nav aria-label="主要功能">
           <button type="button" onClick={() => setDailyOpen(true)}>今日任务</button>
-          <button type="button" onClick={() => void openShop()} disabled={busy}>商店</button>
+          <button type="button" onClick={() => void openShop('luck')} disabled={busy}>商店</button>
           <button type="button">排行榜</button>
           <button type="button" onClick={handleLogout} disabled={busy}>退出</button>
         </nav>
@@ -468,14 +485,17 @@ export function App() {
             <div className="redeem-drop-zone" ref={redeemZoneRef}>
               <span>兑奖区</span><strong>中奖卡拖到这里</strong><small>未中奖卡不会被兑换</small>
             </div>
-            <div className="trash-drop-zone" ref={trashZoneRef}>
+            <div className={`trash-drop-zone ${user.trashOwned ? '' : 'locked-zone'}`} ref={trashZoneRef}>
               <span aria-hidden="true">🗑️</span><strong>垃圾桶</strong><small>拖入后可撤销5秒</small>
+              {!user.trashOwned && <button type="button" onClick={() => void openShop('trash')} disabled={busy}>购买 · 100金币</button>}
             </div>
           </div>
 
-          <section className="fixed-slot-panel" aria-label="固定卡槽">
+          <section className={`fixed-slot-panel ${user.cardSlotsOwned ? '' : 'locked-zone'}`} aria-label="固定卡槽">
             <div className="fixed-slot-heading"><div><span className="eyebrow">PROTECTED STORAGE</span><h2>固定卡槽</h2></div><small>{slotTickets.length} / 10</small></div>
-            <div className="fixed-slots">
+            {!user.cardSlotsOwned ? (
+              <div className="slot-lock-copy"><span>▥</span><strong>10个保护卡位尚未开放</strong><small>一次购买，永久使用</small><button type="button" className="gold-button" onClick={() => void openShop('card-slots')} disabled={busy}>购买 · 500金币</button></div>
+            ) : <div className="fixed-slots">
               {Array.from({ length: 10 }, (_, index) => {
                 const slotTicket = slotTickets.find((ticket) => ticket.slotIndex === index + 1)
                 return (
@@ -490,7 +510,7 @@ export function App() {
                   </div>
                 )
               })}
-            </div>
+            </div>}
           </section>
 
           <div className="free-desk" ref={deskRef} aria-label="可自由摆放卡片的桌面">
@@ -565,7 +585,7 @@ export function App() {
       )}
 
       {shopOpen && shop && user && (
-        <ShopDialog user={user} shop={shop} busy={busy} onClose={() => setShopOpen(false)} onUpgrade={upgradeItem} />
+        <ShopDialog user={user} shop={shop} busy={busy} initialItemCode={shopFocus} onClose={() => setShopOpen(false)} onUpgrade={upgradeItem} />
       )}
     </main>
   )

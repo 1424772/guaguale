@@ -14,6 +14,54 @@ type weightedResult struct {
 	symbol  string
 }
 
+var streetResults = []weightedResult{
+	{tier: "jackpot", base: 300, maximum: 400, reward: 4500, symbol: "游戏机"},
+	{tier: "television", base: 500, maximum: 800, reward: 3000, symbol: "小电视"},
+	{tier: "toy_car", base: 600, maximum: 1000, reward: 2250, symbol: "玩具车"},
+	{tier: "ice_cream", base: 900, maximum: 1300, reward: 1800, symbol: "雪糕"},
+	{tier: "ice_pop", base: 1200, maximum: 1700, reward: 1500, symbol: "冰棍"},
+	{tier: "cola", base: 1500, maximum: 1400, reward: 1200, symbol: "可乐"},
+	{tier: "latiao", base: 1500, maximum: 1400, reward: 600, symbol: "辣条"},
+	{tier: "none", base: 3500, maximum: 2000},
+}
+
+var arcadeResults = []weightedResult{
+	{tier: "jackpot", base: 500, maximum: 700, reward: 15000, symbol: "街机皇冠"},
+	{tier: "plane", base: 1000, maximum: 1400, reward: 8000, symbol: "飞机"},
+	{tier: "race_car", base: 1500, maximum: 2400, reward: 5200, symbol: "赛车"},
+	{tier: "boxing_glove", base: 2000, maximum: 1700, reward: 4000, symbol: "拳套"},
+	{tier: "marble", base: 2000, maximum: 1800, reward: 2500, symbol: "弹珠"},
+	{tier: "none", base: 3000, maximum: 2000},
+}
+
+var goldMineResults = []weightedResult{
+	{tier: "match_6", base: 500, maximum: 700, reward: 45000, symbol: "6"},
+	{tier: "match_5", base: 900, maximum: 1400, reward: 24000, symbol: "5"},
+	{tier: "match_4", base: 1500, maximum: 2500, reward: 15000, symbol: "4"},
+	{tier: "match_3", base: 1800, maximum: 1600, reward: 12000, symbol: "3"},
+	{tier: "match_2", base: 2300, maximum: 1800, reward: 7500, symbol: "2"},
+	{tier: "none", base: 3000, maximum: 2000, symbol: "0"},
+}
+
+var rocketResults = []weightedResult{
+	{tier: "fuel_11_12", base: 500, maximum: 700, reward: 120000, symbol: "11-12"},
+	{tier: "fuel_9_10", base: 1000, maximum: 1500, reward: 64000, symbol: "9-10"},
+	{tier: "fuel_8", base: 1500, maximum: 2400, reward: 40000, symbol: "8"},
+	{tier: "fuel_6_7", base: 2000, maximum: 1700, reward: 32000, symbol: "6-7"},
+	{tier: "fuel_4_5", base: 2000, maximum: 1700, reward: 20000, symbol: "4-5"},
+	{tier: "none", base: 3000, maximum: 2000, symbol: "0-3"},
+}
+
+var deepSeaResults = []weightedResult{
+	{tier: "crown", base: 300, maximum: 600, reward: 240000, symbol: "海神王冠"},
+	{tier: "chest", base: 800, maximum: 1800, reward: 120000, symbol: "黄金宝箱"},
+	{tier: "pearl", base: 2000, maximum: 2600, reward: 72000, symbol: "珍珠贝"},
+	{tier: "anchor", base: 2400, maximum: 2200, reward: 56000, symbol: "生锈船锚"},
+	{tier: "bottle", base: 2000, maximum: 1300, reward: 32000, symbol: "漂流瓶"},
+	{tier: "boot", base: 1500, maximum: 900, reward: 20000, symbol: "破皮靴"},
+	{tier: "seaweed", base: 1000, maximum: 600, reward: 10000, symbol: "海草团"},
+}
+
 func Draw(cardCode string, luckLevel uint8) (domain.Outcome, error) {
 	switch cardCode {
 	case FirstCardCode:
@@ -34,17 +82,7 @@ func Draw(cardCode string, luckLevel uint8) (domain.Outcome, error) {
 }
 
 func drawStreetStore(luckLevel uint8) (domain.Outcome, error) {
-	results := []weightedResult{
-		{tier: "jackpot", base: 300, maximum: 400, reward: 4500, symbol: "游戏机"},
-		{tier: "television", base: 500, maximum: 800, reward: 3000, symbol: "小电视"},
-		{tier: "toy_car", base: 600, maximum: 1000, reward: 2250, symbol: "玩具车"},
-		{tier: "ice_cream", base: 900, maximum: 1300, reward: 1800, symbol: "雪糕"},
-		{tier: "ice_pop", base: 1200, maximum: 1700, reward: 1500, symbol: "冰棍"},
-		{tier: "cola", base: 1500, maximum: 1400, reward: 1200, symbol: "可乐"},
-		{tier: "latiao", base: 1500, maximum: 1400, reward: 600, symbol: "辣条"},
-		{tier: "none", base: 3500, maximum: 2000},
-	}
-	selected, err := chooseWeighted(results, luckLevel)
+	selected, err := chooseWeighted(streetResults, luckLevel)
 	if err != nil {
 		return domain.Outcome{}, err
 	}
@@ -68,15 +106,7 @@ func drawStreetStore(luckLevel uint8) (domain.Outcome, error) {
 }
 
 func drawArcade(luckLevel uint8) (domain.Outcome, error) {
-	results := []weightedResult{
-		{tier: "jackpot", base: 500, maximum: 700, reward: 15000, symbol: "街机皇冠"},
-		{tier: "plane", base: 1000, maximum: 1400, reward: 8000, symbol: "飞机"},
-		{tier: "race_car", base: 1500, maximum: 2400, reward: 5200, symbol: "赛车"},
-		{tier: "boxing_glove", base: 2000, maximum: 1700, reward: 4000, symbol: "拳套"},
-		{tier: "marble", base: 2000, maximum: 1800, reward: 2500, symbol: "弹珠"},
-		{tier: "none", base: 3000, maximum: 2000},
-	}
-	selected, err := chooseWeighted(results, luckLevel)
+	selected, err := chooseWeighted(arcadeResults, luckLevel)
 	if err != nil {
 		return domain.Outcome{}, err
 	}
@@ -101,15 +131,7 @@ func drawArcade(luckLevel uint8) (domain.Outcome, error) {
 }
 
 func drawGoldMine(luckLevel uint8) (domain.Outcome, error) {
-	results := []weightedResult{
-		{tier: "match_6", base: 500, maximum: 700, reward: 45000, symbol: "6"},
-		{tier: "match_5", base: 900, maximum: 1400, reward: 24000, symbol: "5"},
-		{tier: "match_4", base: 1500, maximum: 2500, reward: 15000, symbol: "4"},
-		{tier: "match_3", base: 1800, maximum: 1600, reward: 12000, symbol: "3"},
-		{tier: "match_2", base: 2300, maximum: 1800, reward: 7500, symbol: "2"},
-		{tier: "none", base: 3000, maximum: 2000, symbol: "0"},
-	}
-	selected, err := chooseWeighted(results, luckLevel)
+	selected, err := chooseWeighted(goldMineResults, luckLevel)
 	if err != nil {
 		return domain.Outcome{}, err
 	}
@@ -151,15 +173,7 @@ func drawGoldMine(luckLevel uint8) (domain.Outcome, error) {
 }
 
 func drawRocket(luckLevel uint8) (domain.Outcome, error) {
-	results := []weightedResult{
-		{tier: "fuel_11_12", base: 500, maximum: 700, reward: 120000, symbol: "11-12"},
-		{tier: "fuel_9_10", base: 1000, maximum: 1500, reward: 64000, symbol: "9-10"},
-		{tier: "fuel_8", base: 1500, maximum: 2400, reward: 40000, symbol: "8"},
-		{tier: "fuel_6_7", base: 2000, maximum: 1700, reward: 32000, symbol: "6-7"},
-		{tier: "fuel_4_5", base: 2000, maximum: 1700, reward: 20000, symbol: "4-5"},
-		{tier: "none", base: 3000, maximum: 2000, symbol: "0-3"},
-	}
-	selected, err := chooseWeighted(results, luckLevel)
+	selected, err := chooseWeighted(rocketResults, luckLevel)
 	if err != nil {
 		return domain.Outcome{}, err
 	}
@@ -197,16 +211,7 @@ func drawRocket(luckLevel uint8) (domain.Outcome, error) {
 }
 
 func drawDeepSea(luckLevel uint8) (domain.Outcome, error) {
-	results := []weightedResult{
-		{tier: "crown", base: 300, maximum: 600, reward: 240000, symbol: "海神王冠"},
-		{tier: "chest", base: 800, maximum: 1800, reward: 120000, symbol: "黄金宝箱"},
-		{tier: "pearl", base: 2000, maximum: 2600, reward: 72000, symbol: "珍珠贝"},
-		{tier: "anchor", base: 2400, maximum: 2200, reward: 56000, symbol: "生锈船锚"},
-		{tier: "bottle", base: 2000, maximum: 1300, reward: 32000, symbol: "漂流瓶"},
-		{tier: "boot", base: 1500, maximum: 900, reward: 20000, symbol: "破皮靴"},
-		{tier: "seaweed", base: 1000, maximum: 600, reward: 10000, symbol: "海草团"},
-	}
-	selected, err := chooseWeighted(results, luckLevel)
+	selected, err := chooseWeighted(deepSeaResults, luckLevel)
 	if err != nil {
 		return domain.Outcome{}, err
 	}

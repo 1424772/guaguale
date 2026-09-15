@@ -4,17 +4,21 @@ export type User = {
   balance: number
   luckLevel: number
   scratchLevel: number
+  trashOwned: boolean
+  cardSlotsOwned: boolean
   createdAt: string
 }
 
 export type ShopItem = {
-  code: 'luck' | 'scratch-range'
+  code: 'luck' | 'scratch-range' | 'trash' | 'card-slots'
   name: string
-  category: 'luck' | 'efficiency'
+  category: 'luck' | 'efficiency' | 'safety'
   level: number
   maxLevel: number
   effectPercent: number
   nextEffectPercent?: number
+  effectText: string
+  nextEffectText?: string
   nextPrice?: number
   totalSpent: number
   description: string
@@ -22,7 +26,24 @@ export type ShopItem = {
   relockedCards: string[]
 }
 
-export type ShopStatus = { items: ShopItem[] }
+export type LuckTierImpact = {
+  label: string
+  rewardText: string
+  currentBasisPoint: number
+  nextBasisPoint: number
+}
+
+export type LuckCardImpact = {
+  cardCode: string
+  cardName: string
+  currentLevel: number
+  nextLevel: number
+  currentRtpBasisPoint: number
+  nextRtpBasisPoint: number
+  tiers: LuckTierImpact[]
+}
+
+export type ShopStatus = { items: ShopItem[]; luckCards: LuckCardImpact[] }
 
 export type Card = {
   code: string

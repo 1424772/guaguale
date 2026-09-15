@@ -3,12 +3,14 @@ package domain
 import "time"
 
 type User struct {
-	ID           uint64    `json:"id"`
-	Username     string    `json:"username"`
-	Balance      int64     `json:"balance"`
-	LuckLevel    uint8     `json:"luckLevel"`
-	ScratchLevel uint8     `json:"scratchLevel"`
-	CreatedAt    time.Time `json:"createdAt"`
+	ID             uint64    `json:"id"`
+	Username       string    `json:"username"`
+	Balance        int64     `json:"balance"`
+	LuckLevel      uint8     `json:"luckLevel"`
+	ScratchLevel   uint8     `json:"scratchLevel"`
+	TrashOwned     bool      `json:"trashOwned"`
+	CardSlotsOwned bool      `json:"cardSlotsOwned"`
+	CreatedAt      time.Time `json:"createdAt"`
 }
 
 type Session struct {
@@ -112,6 +114,8 @@ type ShopItem struct {
 	MaxLevel          uint8    `json:"maxLevel"`
 	EffectPercent     int      `json:"effectPercent"`
 	NextEffectPercent int      `json:"nextEffectPercent,omitempty"`
+	EffectText        string   `json:"effectText"`
+	NextEffectText    string   `json:"nextEffectText,omitempty"`
 	NextPrice         int64    `json:"nextPrice,omitempty"`
 	TotalSpent        int64    `json:"totalSpent"`
 	Description       string   `json:"description"`
@@ -120,7 +124,25 @@ type ShopItem struct {
 }
 
 type ShopStatus struct {
-	Items []ShopItem `json:"items"`
+	Items     []ShopItem       `json:"items"`
+	LuckCards []LuckCardImpact `json:"luckCards"`
+}
+
+type LuckTierImpact struct {
+	Label             string `json:"label"`
+	RewardText        string `json:"rewardText"`
+	CurrentBasisPoint int    `json:"currentBasisPoint"`
+	NextBasisPoint    int    `json:"nextBasisPoint"`
+}
+
+type LuckCardImpact struct {
+	CardCode             string           `json:"cardCode"`
+	CardName             string           `json:"cardName"`
+	CurrentLevel         uint8            `json:"currentLevel"`
+	NextLevel            uint8            `json:"nextLevel"`
+	CurrentRTPBasisPoint int              `json:"currentRtpBasisPoint"`
+	NextRTPBasisPoint    int              `json:"nextRtpBasisPoint"`
+	Tiers                []LuckTierImpact `json:"tiers"`
 }
 
 type ItemUpgrade struct {

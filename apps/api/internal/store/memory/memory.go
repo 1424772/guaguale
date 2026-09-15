@@ -85,6 +85,10 @@ func (store *Store) UpgradeItem(_ context.Context, input basestore.UpgradeItemIn
 	currentLevel := record.user.LuckLevel
 	if input.ItemCode == "scratch-range" {
 		currentLevel = record.user.ScratchLevel
+	} else if input.ItemCode == "trash" {
+		currentLevel = boolLevel(record.user.TrashOwned)
+	} else if input.ItemCode == "card-slots" {
+		currentLevel = boolLevel(record.user.CardSlotsOwned)
 	} else if input.ItemCode != "luck" {
 		return domain.User{}, domain.ItemUpgrade{}, false, basestore.ErrInvalidState
 	}
@@ -100,8 +104,12 @@ func (store *Store) UpgradeItem(_ context.Context, input basestore.UpgradeItemIn
 	record.user.Balance -= input.Price
 	if input.ItemCode == "luck" {
 		record.user.LuckLevel = input.ToLevel
-	} else {
+	} else if input.ItemCode == "scratch-range" {
 		record.user.ScratchLevel = input.ToLevel
+	} else if input.ItemCode == "trash" {
+		record.user.TrashOwned = true
+	} else {
+		record.user.CardSlotsOwned = true
 	}
 	store.users[input.UserID] = record
 	upgrade := domain.ItemUpgrade{
@@ -401,6 +409,9 @@ func (store *Store) UpdateTicketPlacement(_ context.Context, userID uint64, tick
 	if ticket.State != domain.TicketPurchased && ticket.State != domain.TicketScratched {
 		return domain.Ticket{}, basestore.ErrInvalidState
 	}
+	if placement.Location == domain.TicketInSlot && !store.users[userID].user.CardSlotsOwned {
+		return domain.Ticket{}, basestore.ErrCardSlotsRequired
+	}
 	if placement.Location == domain.TicketInSlot {
 		for id, candidate := range store.tickets {
 			if id != ticketID && candidate.UserID == userID && candidate.SlotIndex != nil && placement.SlotIndex != nil && *candidate.SlotIndex == *placement.SlotIndex && (candidate.State == domain.TicketPurchased || candidate.State == domain.TicketScratched) {
@@ -428,6 +439,9 @@ func (store *Store) DiscardTicket(_ context.Context, userID uint64, ticketID str
 	if ticket.Location == domain.TicketInSlot {
 		return domain.Ticket{}, basestore.ErrProtected
 	}
+	if !store.users[userID].user.TrashOwned {
+		return domain.Ticket{}, basestore.ErrTrashRequired
+	}
 	if ticket.State != domain.TicketPurchased && ticket.State != domain.TicketScratched {
 		return domain.Ticket{}, basestore.ErrInvalidState
 	}
@@ -436,6 +450,13 @@ func (store *Store) DiscardTicket(_ context.Context, userID uint64, ticketID str
 	ticket.DiscardedAt = &discardedAt
 	store.tickets[ticketID] = ticket
 	return revealTicket(ticket), nil
+}
+
+func boolLevel(value bool) uint8 {
+	if value {
+		return 1
+	}
+	return 0
 }
 
 func (store *Store) DeleteExpiredSessions(_ context.Context, cutoff time.Time) error {

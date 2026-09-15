@@ -59,12 +59,14 @@ func (store *Store) CreateUser(ctx context.Context, username, passwordHash strin
 		return domain.User{}, err
 	}
 	return domain.User{
-		ID:           uint64(userID),
-		Username:     username,
-		Balance:      initialBalance,
-		LuckLevel:    0,
-		ScratchLevel: 1,
-		CreatedAt:    time.Now().UTC(),
+		ID:             uint64(userID),
+		Username:       username,
+		Balance:        initialBalance,
+		LuckLevel:      0,
+		ScratchLevel:   1,
+		TrashOwned:     false,
+		CardSlotsOwned: false,
+		CreatedAt:      time.Now().UTC(),
 	}, nil
 }
 
@@ -72,9 +74,9 @@ func (store *Store) UserByUsername(ctx context.Context, username string) (domain
 	var user domain.User
 	var passwordHash string
 	err := store.db.QueryRowContext(ctx, `
-		SELECT id, username, password_hash, balance, luck_level, scratch_level, created_at
+		SELECT id, username, password_hash, balance, luck_level, scratch_level, trash_owned, card_slots_owned, created_at
 		FROM users WHERE username = ?`, username,
-	).Scan(&user.ID, &user.Username, &passwordHash, &user.Balance, &user.LuckLevel, &user.ScratchLevel, &user.CreatedAt)
+	).Scan(&user.ID, &user.Username, &passwordHash, &user.Balance, &user.LuckLevel, &user.ScratchLevel, &user.TrashOwned, &user.CardSlotsOwned, &user.CreatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return domain.User{}, "", basestore.ErrNotFound
 	}
@@ -84,11 +86,11 @@ func (store *Store) UserByUsername(ctx context.Context, username string) (domain
 func (store *Store) UserBySession(ctx context.Context, tokenHash [32]byte) (domain.User, error) {
 	var user domain.User
 	err := store.db.QueryRowContext(ctx, `
-		SELECT u.id, u.username, u.balance, u.luck_level, u.scratch_level, u.created_at
+		SELECT u.id, u.username, u.balance, u.luck_level, u.scratch_level, u.trash_owned, u.card_slots_owned, u.created_at
 		FROM sessions s
 		JOIN users u ON u.id = s.user_id
 		WHERE s.token_hash = ? AND s.expires_at > UTC_TIMESTAMP(6)`, tokenHash[:],
-	).Scan(&user.ID, &user.Username, &user.Balance, &user.LuckLevel, &user.ScratchLevel, &user.CreatedAt)
+	).Scan(&user.ID, &user.Username, &user.Balance, &user.LuckLevel, &user.ScratchLevel, &user.TrashOwned, &user.CardSlotsOwned, &user.CreatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return domain.User{}, basestore.ErrNotFound
 	}
@@ -587,6 +589,12 @@ func (store *Store) UpgradeItem(ctx context.Context, input basestore.UpgradeItem
 	if input.ItemCode == "scratch-range" {
 		currentLevel = user.ScratchLevel
 		updateQuery = `UPDATE users SET balance = ?, scratch_level = ? WHERE id = ?`
+	} else if input.ItemCode == "trash" {
+		currentLevel = boolLevel(user.TrashOwned)
+		updateQuery = `UPDATE users SET balance = ?, trash_owned = ? WHERE id = ?`
+	} else if input.ItemCode == "card-slots" {
+		currentLevel = boolLevel(user.CardSlotsOwned)
+		updateQuery = `UPDATE users SET balance = ?, card_slots_owned = ? WHERE id = ?`
 	} else if input.ItemCode != "luck" {
 		return domain.User{}, domain.ItemUpgrade{}, false, basestore.ErrInvalidState
 	}
@@ -625,8 +633,12 @@ func (store *Store) UpgradeItem(ctx context.Context, input basestore.UpgradeItem
 	}
 	if input.ItemCode == "luck" {
 		user.LuckLevel = input.ToLevel
-	} else {
+	} else if input.ItemCode == "scratch-range" {
 		user.ScratchLevel = input.ToLevel
+	} else if input.ItemCode == "trash" {
+		user.TrashOwned = true
+	} else {
+		user.CardSlotsOwned = true
 	}
 	upgrade := domain.ItemUpgrade{
 		ID: input.ID, UserID: user.ID, ItemCode: input.ItemCode, FromLevel: currentLevel,
@@ -650,6 +662,15 @@ func (store *Store) UpdateTicketPlacement(ctx context.Context, userID uint64, ti
 	}
 	if ticket.State != domain.TicketPurchased && ticket.State != domain.TicketScratched {
 		return domain.Ticket{}, basestore.ErrInvalidState
+	}
+	if placement.Location == domain.TicketInSlot {
+		user, err := lockedUser(ctx, tx, userID)
+		if err != nil {
+			return domain.Ticket{}, err
+		}
+		if !user.CardSlotsOwned {
+			return domain.Ticket{}, basestore.ErrCardSlotsRequired
+		}
 	}
 	_, err = tx.ExecContext(ctx, `
 		UPDATE tickets
@@ -688,6 +709,13 @@ func (store *Store) DiscardTicket(ctx context.Context, userID uint64, ticketID s
 	}
 	if ticket.Location == domain.TicketInSlot {
 		return domain.Ticket{}, basestore.ErrProtected
+	}
+	user, err := lockedUser(ctx, tx, userID)
+	if err != nil {
+		return domain.Ticket{}, err
+	}
+	if !user.TrashOwned {
+		return domain.Ticket{}, basestore.ErrTrashRequired
 	}
 	if ticket.State != domain.TicketPurchased && ticket.State != domain.TicketScratched {
 		return domain.Ticket{}, basestore.ErrInvalidState
@@ -744,13 +772,20 @@ func scanTicket(row scanner) (domain.Ticket, error) {
 func lockedUser(ctx context.Context, tx *sql.Tx, userID uint64) (domain.User, error) {
 	var user domain.User
 	err := tx.QueryRowContext(ctx, `
-		SELECT id, username, balance, luck_level, scratch_level, created_at
+		SELECT id, username, balance, luck_level, scratch_level, trash_owned, card_slots_owned, created_at
 		FROM users WHERE id = ? FOR UPDATE`, userID,
-	).Scan(&user.ID, &user.Username, &user.Balance, &user.LuckLevel, &user.ScratchLevel, &user.CreatedAt)
+	).Scan(&user.ID, &user.Username, &user.Balance, &user.LuckLevel, &user.ScratchLevel, &user.TrashOwned, &user.CardSlotsOwned, &user.CreatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return domain.User{}, basestore.ErrNotFound
 	}
 	return user, err
+}
+
+func boolLevel(value bool) uint8 {
+	if value {
+		return 1
+	}
+	return 0
 }
 
 func itemUpgradeByKey(ctx context.Context, tx *sql.Tx, userID uint64, key string) (domain.ItemUpgrade, error) {

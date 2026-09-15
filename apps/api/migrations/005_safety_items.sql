@@ -1,0 +1,3 @@
+ALTER TABLE users
+    ADD COLUMN trash_owned BOOLEAN NOT NULL DEFAULT FALSE AFTER scratch_level,
+    ADD COLUMN card_slots_owned BOOLEAN NOT NULL DEFAULT FALSE AFTER trash_owned;

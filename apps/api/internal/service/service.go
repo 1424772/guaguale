@@ -136,7 +136,7 @@ func (service *Service) Cards(balance int64) []domain.Card {
 }
 
 func (service *Service) Shop(user domain.User) domain.ShopStatus {
-	return game.Shop(user.Balance, user.LuckLevel, user.ScratchLevel)
+	return game.Shop(user.Balance, user.LuckLevel, user.ScratchLevel, user.TrashOwned, user.CardSlotsOwned)
 }
 
 func (service *Service) UpgradeItem(ctx context.Context, user domain.User, itemCode, idempotencyKey string) (UpgradeResult, error) {
@@ -146,6 +146,18 @@ func (service *Service) UpgradeItem(ctx context.Context, user domain.User, itemC
 	currentLevel := user.LuckLevel
 	if itemCode == game.ScratchRangeItemCode {
 		currentLevel = user.ScratchLevel
+	} else if itemCode == game.TrashItemCode {
+		if user.TrashOwned {
+			currentLevel = 1
+		} else {
+			currentLevel = 0
+		}
+	} else if itemCode == game.CardSlotsItemCode {
+		if user.CardSlotsOwned {
+			currentLevel = 1
+		} else {
+			currentLevel = 0
+		}
 	} else if itemCode != game.LuckItemCode {
 		return UpgradeResult{}, ErrItemUnavailable
 	}

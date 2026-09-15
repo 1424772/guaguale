@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { ShopItem, ShopStatus, User } from './api'
 
 const coins = new Intl.NumberFormat('zh-CN')
@@ -7,23 +7,51 @@ type Props = {
   user: User
   shop: ShopStatus
   busy: boolean
+  initialItemCode?: ShopItem['code']
   onClose: () => void
   onUpgrade: (item: ShopItem) => void
 }
 
-export function ShopDialog({ user, shop, busy, onClose, onUpgrade }: Props) {
-  const [selectedCode, setSelectedCode] = useState(shop.items[0]?.code ?? 'luck')
-  const [confirming, setConfirming] = useState(false)
-  const selected = shop.items.find((item) => item.code === selectedCode) ?? shop.items[0]
+const itemMeta: Record<ShopItem['code'], { icon: string; group: string }> = {
+  luck: { icon: '✦', group: '长期成长' },
+  'scratch-range': { icon: '⌁', group: '操作效率' },
+  trash: { icon: '🗑', group: '桌面整理' },
+  'card-slots': { icon: '▥', group: '卡片保护' },
+}
 
-  useEffect(() => setConfirming(false), [selectedCode, selected?.level])
+function percent(basisPoint: number) {
+  return `${(basisPoint / 100).toFixed(2)}%`
+}
+
+export function ShopDialog({ user, shop, busy, initialItemCode, onClose, onUpgrade }: Props) {
+  const fallbackCode = shop.items[0]?.code ?? 'luck'
+  const [selectedCode, setSelectedCode] = useState<ShopItem['code']>(initialItemCode ?? fallbackCode)
+  const [confirming, setConfirming] = useState(false)
+  const [showOdds, setShowOdds] = useState(false)
+  const selected = shop.items.find((item) => item.code === selectedCode) ?? shop.items[0]
+  const category = selected?.category ?? 'luck'
+  const visibleItems = useMemo(() => shop.items.filter((item) => item.category === category), [category, shop.items])
+
+  useEffect(() => {
+    if (initialItemCode) setSelectedCode(initialItemCode)
+  }, [initialItemCode])
+  useEffect(() => {
+    setConfirming(false)
+    setShowOdds(false)
+  }, [selectedCode, selected?.level])
   if (!selected) return null
 
   const maxed = selected.level >= selected.maxLevel
   const nextPrice = selected.nextPrice ?? 0
   const affordable = user.balance >= nextPrice
   const afterBalance = user.balance - nextPrice
-  const effectLabel = selected.code === 'luck' ? '好运系数' : '划动覆盖范围'
+  const oneTime = selected.maxLevel === 1
+  const action = oneTime ? '购买' : '升级'
+
+  function selectCategory(nextCategory: ShopItem['category']) {
+    const first = shop.items.find((item) => item.category === nextCategory)
+    if (first) setSelectedCode(first.code)
+  }
 
   return (
     <div className="modal-backdrop shop-backdrop" role="presentation" onMouseDown={(event) => {
@@ -37,48 +65,64 @@ export function ShopDialog({ user, shop, busy, onClose, onUpgrade }: Props) {
         </header>
 
         <nav className="shop-tabs" aria-label="商店分类">
-          <button type="button" className={selected.category === 'luck' ? 'active' : ''} onClick={() => setSelectedCode('luck')}>好运</button>
-          <button type="button" className={selected.category === 'efficiency' ? 'active' : ''} onClick={() => setSelectedCode('scratch-range')}>效率</button>
-          <button type="button" disabled>整理与安全 · 后续开放</button>
+          <button type="button" className={category === 'luck' ? 'active' : ''} onClick={() => selectCategory('luck')}>好运</button>
+          <button type="button" className={category === 'efficiency' ? 'active' : ''} onClick={() => selectCategory('efficiency')}>效率</button>
+          <button type="button" className={category === 'safety' ? 'active' : ''} onClick={() => selectCategory('safety')}>整理与安全</button>
         </nav>
 
         <div className="shop-layout">
           <div className="shop-items">
-            {shop.items.map((item) => (
+            {visibleItems.map((item) => (
               <button type="button" key={item.code} className={`shop-item ${selected.code === item.code ? 'selected' : ''}`} onClick={() => setSelectedCode(item.code)}>
-                <span className={`shop-item-icon ${item.code}`}>{item.code === 'luck' ? '✦' : '⌁'}</span>
-                <div><small>{item.category === 'luck' ? '长期成长' : '操作效率'}</small><h2>{item.name}</h2><p>等级 {item.level} / {item.maxLevel}</p></div>
-                <strong>{item.level >= item.maxLevel ? '已满级' : `${coins.format(item.nextPrice ?? 0)} 金币`}</strong>
+                <span className={`shop-item-icon ${item.code}`}>{itemMeta[item.code].icon}</span>
+                <div><small>{itemMeta[item.code].group}</small><h2>{item.name}</h2><p>{item.maxLevel === 1 ? item.effectText : `等级 ${item.level} / ${item.maxLevel}`}</p></div>
+                <strong>{item.level >= item.maxLevel ? '已拥有' : `${coins.format(item.nextPrice ?? 0)} 金币`}</strong>
               </button>
             ))}
           </div>
 
           <article className="shop-detail">
-            <div className="shop-detail-title"><span className={`shop-item-icon ${selected.code}`}>{selected.code === 'luck' ? '✦' : '⌁'}</span><div><small>永久道具</small><h2>{selected.name}</h2></div></div>
+            <div className="shop-detail-title"><span className={`shop-item-icon ${selected.code}`}>{itemMeta[selected.code].icon}</span><div><small>永久道具</small><h2>{selected.name}</h2></div></div>
             <p>{selected.description}</p>
             {selected.notice && <div className="shop-note">{selected.notice}</div>}
             <div className="level-progress"><span style={{ width: `${(selected.level / selected.maxLevel) * 100}%` }} /></div>
             <div className="effect-change">
-              <div><small>当前{effectLabel}</small><strong>{selected.effectPercent}%</strong></div>
+              <div><small>当前效果</small><strong>{selected.effectText}</strong></div>
               <span>→</span>
-              <div><small>{maxed ? '当前状态' : `升级至 ${selected.level + 1} 级`}</small><strong>{maxed ? '已满级' : `${selected.nextEffectPercent}%`}</strong></div>
+              <div><small>{maxed ? '当前状态' : oneTime ? '购买后' : `升级至 ${selected.level + 1} 级`}</small><strong>{maxed ? selected.effectText : selected.nextEffectText}</strong></div>
             </div>
             <dl className="shop-costs">
               <div><dt>累计投入</dt><dd>{coins.format(selected.totalSpent)} 金币</dd></div>
-              {!maxed && <div><dt>本次升级</dt><dd>{coins.format(nextPrice)} 金币</dd></div>}
-              {!maxed && <div><dt>升级后余额</dt><dd>{coins.format(Math.max(0, afterBalance))} 金币</dd></div>}
+              {!maxed && <div><dt>本次{action}</dt><dd>{coins.format(nextPrice)} 金币</dd></div>}
+              {!maxed && <div><dt>{action}后余额</dt><dd>{coins.format(Math.max(0, afterBalance))} 金币</dd></div>}
             </dl>
-            {!maxed && selected.relockedCards.length > 0 && (
-              <div className="relock-warning">升级后将暂时重新锁定：{selected.relockedCards.join('、')}</div>
+            {!maxed && selected.relockedCards.length > 0 && <div className="relock-warning">{action}后将暂时重新锁定：{selected.relockedCards.join('、')}</div>}
+
+            {selected.code === 'luck' && (
+              <div className="luck-impact">
+                <button type="button" className="odds-toggle" onClick={() => setShowOdds((value) => !value)}>{showOdds ? '收起真实概率' : '查看当前真实概率与返奖率'}</button>
+                {showOdds && <div className="luck-cards">
+                  {shop.luckCards.map((card) => (
+                    <details key={card.cardCode}>
+                      <summary><strong>{card.cardName}</strong><span>理论返奖率 {percent(card.currentRtpBasisPoint)}{card.currentLevel !== card.nextLevel && ` → ${percent(card.nextRtpBasisPoint)}`}</span></summary>
+                      <div className="luck-tier-table">
+                        <div><strong>结果</strong><strong>当前 L{card.currentLevel}</strong>{card.currentLevel !== card.nextLevel && <strong>下级 L{card.nextLevel}</strong>}</div>
+                        {card.tiers.map((tier) => <div key={tier.label}><span>{tier.label}<small>{tier.rewardText}</small></span><span>{percent(tier.currentBasisPoint)}</span>{card.currentLevel !== card.nextLevel && <span>{percent(tier.nextBasisPoint)}</span>}</div>)}
+                      </div>
+                    </details>
+                  ))}
+                  <p className="rtp-note">理论返奖率是大量重复游戏的统计平均值，不代表单张卡一定获得对应回报。</p>
+                </div>}
+              </div>
             )}
 
-            {maxed ? <div className="max-level-badge">已达到最高等级</div> : confirming ? (
+            {maxed ? <div className="max-level-badge">{oneTime ? '已永久拥有' : '已达到最高等级'}</div> : confirming ? (
               <div className="upgrade-confirm">
-                <p>确认花费 <strong>{coins.format(nextPrice)} 金币</strong>，将“{selected.name}”升级到 {selected.level + 1} 级？</p>
-                <div><button type="button" className="secondary-button" onClick={() => setConfirming(false)} disabled={busy}>取消</button><button type="button" className="gold-button" onClick={() => onUpgrade(selected)} disabled={busy}>{busy ? '升级中…' : '确认升级'}</button></div>
+                <p>确认花费 <strong>{coins.format(nextPrice)} 金币</strong>{oneTime ? `购买“${selected.name}”` : `将“${selected.name}”升级到 ${selected.level + 1} 级`}？</p>
+                <div><button type="button" className="secondary-button" onClick={() => setConfirming(false)} disabled={busy}>取消</button><button type="button" className="gold-button" onClick={() => onUpgrade(selected)} disabled={busy}>{busy ? `${action}中…` : `确认${action}`}</button></div>
               </div>
             ) : (
-              <button type="button" className="gold-button shop-upgrade" onClick={() => setConfirming(true)} disabled={!affordable || busy}>{affordable ? `升级到 ${selected.level + 1} 级` : `还差 ${coins.format(nextPrice - user.balance)} 金币`}</button>
+              <button type="button" className="gold-button shop-upgrade" onClick={() => setConfirming(true)} disabled={!affordable || busy}>{affordable ? (oneTime ? `购买 · ${coins.format(nextPrice)} 金币` : `升级到 ${selected.level + 1} 级`) : `还差 ${coins.format(nextPrice - user.balance)} 金币`}</button>
             )}
           </article>
         </div>

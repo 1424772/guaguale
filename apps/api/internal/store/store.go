@@ -20,6 +20,8 @@ var (
 	ErrSlotOccupied      = errors.New("card slot is occupied")
 	ErrProtected         = errors.New("protected ticket cannot be discarded")
 	ErrUpgradeConflict   = errors.New("item level changed")
+	ErrTrashRequired     = errors.New("trash item is required")
+	ErrCardSlotsRequired = errors.New("card slots item is required")
 )
 
 type CreateTicketInput struct {

@@ -328,6 +328,10 @@ func (api *API) writeError(response http.ResponseWriter, request *http.Request, 
 		writeAPIError(response, http.StatusConflict, "item_unavailable", "该道具已经满级或暂不可升级")
 	case errors.Is(err, store.ErrUpgradeConflict):
 		writeAPIError(response, http.StatusConflict, "upgrade_conflict", "道具等级已变化，请刷新后重试")
+	case errors.Is(err, store.ErrTrashRequired):
+		writeAPIError(response, http.StatusConflict, "trash_required", "请先在商店购买垃圾桶")
+	case errors.Is(err, store.ErrCardSlotsRequired):
+		writeAPIError(response, http.StatusConflict, "card_slots_required", "请先在商店购买固定卡槽")
 	case errors.Is(err, store.ErrNotFound):
 		writeAPIError(response, http.StatusNotFound, "not_found", "没有找到对应内容")
 	case errors.Is(err, store.ErrInvalidState):
