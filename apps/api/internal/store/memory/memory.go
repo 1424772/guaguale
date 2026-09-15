@@ -140,6 +140,10 @@ func (store *Store) PurchaseTicket(_ context.Context, input basestore.CreateTick
 		Reward:      input.Outcome.Reward,
 		Symbols:     append([]string(nil), input.Outcome.Symbols...),
 		State:       domain.TicketPurchased,
+		Location:    domain.TicketInTray,
+		DeskX:       .5,
+		DeskY:       .35,
+		ZIndex:      1,
 		PurchaseKey: input.PurchaseKey,
 		CreatedAt:   now,
 	}
@@ -262,6 +266,10 @@ func (store *Store) SpinDailyWheel(_ context.Context, userID uint64, date, ticke
 		Reward:    selection.Outcome.Reward,
 		Symbols:   append([]string(nil), selection.Outcome.Symbols...),
 		State:     domain.TicketPurchased,
+		Location:  domain.TicketInTray,
+		DeskX:     .5,
+		DeskY:     .35,
+		ZIndex:    1,
 		CreatedAt: now,
 	}
 	store.tickets[ticket.ID] = ticket
@@ -282,7 +290,7 @@ func (store *Store) ListTickets(_ context.Context, userID uint64) ([]domain.Tick
 	}
 	result := make([]domain.Ticket, 0)
 	for _, ticket := range store.tickets {
-		if ticket.UserID == userID && ticket.State != domain.TicketDiscarded {
+		if ticket.UserID == userID && (ticket.State == domain.TicketPurchased || ticket.State == domain.TicketScratched) {
 			result = append(result, publicTicket(ticket))
 		}
 	}
@@ -332,9 +340,57 @@ func (store *Store) RedeemTicket(_ context.Context, userID uint64, ticketID stri
 	store.users[userID] = record
 	now := time.Now().UTC()
 	ticket.State = domain.TicketRedeemed
+	ticket.SlotIndex = nil
 	ticket.RedeemedAt = &now
 	store.tickets[ticketID] = ticket
 	return record.user, revealTicket(ticket), false, nil
+}
+
+func (store *Store) UpdateTicketPlacement(_ context.Context, userID uint64, ticketID string, placement basestore.TicketPlacement) (domain.Ticket, error) {
+	store.mu.Lock()
+	defer store.mu.Unlock()
+	ticket, exists := store.tickets[ticketID]
+	if !exists || ticket.UserID != userID {
+		return domain.Ticket{}, basestore.ErrNotFound
+	}
+	if ticket.State != domain.TicketPurchased && ticket.State != domain.TicketScratched {
+		return domain.Ticket{}, basestore.ErrInvalidState
+	}
+	if placement.Location == domain.TicketInSlot {
+		for id, candidate := range store.tickets {
+			if id != ticketID && candidate.UserID == userID && candidate.SlotIndex != nil && placement.SlotIndex != nil && *candidate.SlotIndex == *placement.SlotIndex && (candidate.State == domain.TicketPurchased || candidate.State == domain.TicketScratched) {
+				return domain.Ticket{}, basestore.ErrSlotOccupied
+			}
+		}
+	}
+	ticket.Location = placement.Location
+	ticket.DeskX = placement.DeskX
+	ticket.DeskY = placement.DeskY
+	ticket.Rotation = placement.Rotation
+	ticket.ZIndex = placement.ZIndex
+	ticket.SlotIndex = placement.SlotIndex
+	store.tickets[ticketID] = ticket
+	return publicTicket(ticket), nil
+}
+
+func (store *Store) DiscardTicket(_ context.Context, userID uint64, ticketID string, discardedAt time.Time) (domain.Ticket, error) {
+	store.mu.Lock()
+	defer store.mu.Unlock()
+	ticket, exists := store.tickets[ticketID]
+	if !exists || ticket.UserID != userID {
+		return domain.Ticket{}, basestore.ErrNotFound
+	}
+	if ticket.Location == domain.TicketInSlot {
+		return domain.Ticket{}, basestore.ErrProtected
+	}
+	if ticket.State != domain.TicketPurchased && ticket.State != domain.TicketScratched {
+		return domain.Ticket{}, basestore.ErrInvalidState
+	}
+	ticket.State = domain.TicketDiscarded
+	ticket.SlotIndex = nil
+	ticket.DiscardedAt = &discardedAt
+	store.tickets[ticketID] = ticket
+	return revealTicket(ticket), nil
 }
 
 func (store *Store) DeleteExpiredSessions(_ context.Context, cutoff time.Time) error {

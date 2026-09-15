@@ -17,6 +17,7 @@ type Session struct {
 }
 
 type TicketState string
+type TicketLocation string
 
 const (
 	TicketPurchased TicketState = "purchased"
@@ -25,24 +26,37 @@ const (
 	TicketDiscarded TicketState = "discarded"
 )
 
+const (
+	TicketInTray TicketLocation = "tray"
+	TicketOnDesk TicketLocation = "desk"
+	TicketInSlot TicketLocation = "slot"
+)
+
 type Ticket struct {
-	ID          string      `json:"id"`
-	UserID      uint64      `json:"-"`
-	CardCode    string      `json:"cardCode"`
-	CardName    string      `json:"cardName"`
-	Price       int64       `json:"nominalPrice"`
-	PricePaid   int64       `json:"pricePaid"`
-	Source      string      `json:"source"`
-	WheelDate   string      `json:"wheelDate,omitempty"`
-	LuckLevel   uint8       `json:"luckLevel"`
-	PrizeTier   string      `json:"prizeTier,omitempty"`
-	Reward      int64       `json:"reward,omitempty"`
-	Symbols     []string    `json:"symbols,omitempty"`
-	State       TicketState `json:"state"`
-	PurchaseKey string      `json:"-"`
-	CreatedAt   time.Time   `json:"createdAt"`
-	ScratchedAt *time.Time  `json:"scratchedAt,omitempty"`
-	RedeemedAt  *time.Time  `json:"redeemedAt,omitempty"`
+	ID          string         `json:"id"`
+	UserID      uint64         `json:"-"`
+	CardCode    string         `json:"cardCode"`
+	CardName    string         `json:"cardName"`
+	Price       int64          `json:"nominalPrice"`
+	PricePaid   int64          `json:"pricePaid"`
+	Source      string         `json:"source"`
+	WheelDate   string         `json:"wheelDate,omitempty"`
+	LuckLevel   uint8          `json:"luckLevel"`
+	PrizeTier   string         `json:"prizeTier,omitempty"`
+	Reward      int64          `json:"reward,omitempty"`
+	Symbols     []string       `json:"symbols,omitempty"`
+	State       TicketState    `json:"state"`
+	Location    TicketLocation `json:"location"`
+	DeskX       float64        `json:"deskX"`
+	DeskY       float64        `json:"deskY"`
+	Rotation    float64        `json:"rotation"`
+	ZIndex      int            `json:"zIndex"`
+	SlotIndex   *int           `json:"slotIndex,omitempty"`
+	PurchaseKey string         `json:"-"`
+	CreatedAt   time.Time      `json:"createdAt"`
+	ScratchedAt *time.Time     `json:"scratchedAt,omitempty"`
+	RedeemedAt  *time.Time     `json:"redeemedAt,omitempty"`
+	DiscardedAt *time.Time     `json:"discardedAt,omitempty"`
 }
 
 type WheelPoolItem struct {

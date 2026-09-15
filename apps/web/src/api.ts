@@ -29,9 +29,16 @@ export type Ticket = {
   reward?: number
   symbols?: string[]
   state: TicketState
+  location: 'tray' | 'desk' | 'slot'
+  deskX: number
+  deskY: number
+  rotation: number
+  zIndex: number
+  slotIndex?: number
   createdAt: string
   scratchedAt?: string
   redeemedAt?: string
+  discardedAt?: string
 }
 
 export type WheelPoolItem = {
@@ -155,6 +162,20 @@ export const api = {
     ticket: Ticket
     idempotent: boolean
   }>(`/api/v1/tickets/${ticketId}/redeem`, {
+    method: 'POST',
+  }),
+  placeTicket: (ticketId: string, placement: {
+    location: 'desk' | 'slot'
+    deskX: number
+    deskY: number
+    rotation: number
+    zIndex: number
+    slotIndex?: number
+  }) => request<{ ticket: Ticket }>(`/api/v1/tickets/${ticketId}/placement`, {
+    method: 'PATCH',
+    body: JSON.stringify(placement),
+  }),
+  discardTicket: (ticketId: string) => request<{ ticket: Ticket }>(`/api/v1/tickets/${ticketId}/discard`, {
     method: 'POST',
   }),
 }

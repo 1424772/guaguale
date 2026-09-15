@@ -1,5 +1,6 @@
-import { FormEvent, useEffect, useMemo, useState } from 'react'
+import { FormEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { ApiError, api, type Card, type DailyStatus, type Ticket, type User } from './api'
+import { DeskTicket, type DeskPlacement } from './DeskTicket'
 import { PlateCleaning } from './PlateCleaning'
 import { ScratchCard } from './ScratchCard'
 import ticketArtwork from './assets/concepts/lingqian-ticket-play-v1.webp'
@@ -24,6 +25,12 @@ export function App() {
   const [dailyOpen, setDailyOpen] = useState(false)
   const [dailyBusy, setDailyBusy] = useState(false)
   const [wheelSpinning, setWheelSpinning] = useState(false)
+  const [pendingDiscard, setPendingDiscard] = useState<Ticket | null>(null)
+  const discardTimerRef = useRef<number | null>(null)
+  const deskRef = useRef<HTMLDivElement>(null)
+  const redeemZoneRef = useRef<HTMLDivElement>(null)
+  const trashZoneRef = useRef<HTMLDivElement>(null)
+  const slotRefs = useRef<Array<HTMLDivElement | null>>([])
 
   useEffect(() => {
     void bootstrap()
@@ -59,6 +66,9 @@ export function App() {
   async function handleLogout() {
     setBusy(true)
     try {
+      if (discardTimerRef.current !== null) window.clearTimeout(discardTimerRef.current)
+      discardTimerRef.current = null
+      setPendingDiscard(null)
       await api.logout()
       setUser(null)
       setCards([])
@@ -130,7 +140,7 @@ export function App() {
       setUser(result.user)
       setDaily(result.daily)
       setTickets((current) => [result.ticket, ...current.filter((ticket) => ticket.id !== result.ticket.id)])
-      setNotice(`转盘获得《${result.ticket.cardName}》，已放到桌面`)
+      setNotice(`转盘获得《${result.ticket.cardName}》，已放入购卡托盘`)
     } catch (error) {
       setNotice(messageFrom(error))
     } finally {
@@ -148,7 +158,7 @@ export function App() {
       setUser(result.user)
       setCards((current) => updateUnlocks(current, result.user.balance))
       setTickets((current) => [result.ticket, ...current.filter((ticket) => ticket.id !== result.ticket.id)])
-      setNotice('购买成功，卡片已放到桌面')
+      setNotice('购买成功，卡片已放入购卡托盘')
     } catch (error) {
       setNotice(messageFrom(error))
     } finally {
@@ -181,19 +191,151 @@ export function App() {
 
   async function redeem() {
     if (!activeTicket || !activeTicket.reward || busy) return
+    await redeemTicket(activeTicket)
+  }
+
+  async function redeemTicket(ticket: Ticket) {
+    if (!ticket.reward || busy) return
     setBusy(true)
     try {
-      const result = await api.redeem(activeTicket.id)
+      const result = await api.redeem(ticket.id)
       setUser(result.user)
       setCards((current) => updateUnlocks(current, result.user.balance))
-      setTickets((current) => current.map((ticket) => ticket.id === result.ticket.id ? result.ticket : ticket))
-      setActiveTicket(result.ticket)
+      setTickets((current) => current.filter((item) => item.id !== result.ticket.id))
+      if (activeTicket?.id === ticket.id) setActiveTicket(result.ticket)
       setNotice(`兑奖成功，获得 ${coinFormatter.format(result.ticket.reward ?? 0)} 金币`)
     } catch (error) {
       setNotice(messageFrom(error))
     } finally {
       setBusy(false)
     }
+  }
+
+  async function updateTicketPlacement(ticket: Ticket, placement: {
+    location: 'desk' | 'slot'
+    deskX: number
+    deskY: number
+    rotation: number
+    zIndex: number
+    slotIndex?: number
+  }) {
+    setTickets((current) => current.map((item) => item.id === ticket.id ? { ...item, ...placement } : item))
+    try {
+      const result = await api.placeTicket(ticket.id, placement)
+      setTickets((current) => current.map((item) => item.id === ticket.id ? result.ticket : item))
+    } catch (error) {
+      setNotice(messageFrom(error))
+      try {
+        const response = await api.tickets()
+        setTickets(response.tickets)
+      } catch {
+        // The next normal refresh will reconcile the layout.
+      }
+    }
+  }
+
+  function sendToDesk(ticket: Ticket) {
+    const deskCount = tickets.filter((item) => item.location === 'desk').length
+    const column = deskCount % 3
+    const row = Math.floor(deskCount / 3) % 3
+    void updateTicketPlacement(ticket, {
+      location: 'desk',
+      deskX: .23 + column * .27,
+      deskY: .24 + row * .25,
+      rotation: ((deskCount * 7) % 11) - 5,
+      zIndex: Math.max(1, ...tickets.map((item) => item.zIndex)) + 1,
+    })
+  }
+
+  function removeFromSlot(ticket: Ticket) {
+    void updateTicketPlacement(ticket, {
+      location: 'desk',
+      deskX: ticket.deskX || .5,
+      deskY: ticket.deskY || .45,
+      rotation: ticket.rotation,
+      zIndex: Math.max(1, ...tickets.map((item) => item.zIndex)) + 1,
+    })
+  }
+
+  function pinToFirstSlot(ticket: Ticket) {
+    const occupied = new Set(tickets.flatMap((item) => item.slotIndex ? [item.slotIndex] : []))
+    const firstFree = Array.from({ length: 10 }, (_, index) => index + 1).find((index) => !occupied.has(index))
+    if (!firstFree) {
+      setNotice('固定卡槽已经放满10张卡片')
+      return
+    }
+    setActiveTicket(null)
+    void updateTicketPlacement(ticket, {
+      location: 'slot',
+      deskX: ticket.deskX,
+      deskY: ticket.deskY,
+      rotation: ticket.rotation,
+      zIndex: ticket.zIndex,
+      slotIndex: firstFree,
+    })
+    setNotice(`《${ticket.cardName}》已放入固定卡槽 ${firstFree}`)
+  }
+
+  function pointInside(element: HTMLElement | null, point: { x: number; y: number }) {
+    if (!element) return false
+    const bounds = element.getBoundingClientRect()
+    return point.x >= bounds.left && point.x <= bounds.right && point.y >= bounds.top && point.y <= bounds.bottom
+  }
+
+  function handleTicketDrop(ticket: Ticket, point: { x: number; y: number }, placement: DeskPlacement) {
+    const slotIndex = slotRefs.current.findIndex((slot) => pointInside(slot, point))
+    if (slotIndex >= 0) {
+      void updateTicketPlacement(ticket, { ...placement, location: 'slot', slotIndex: slotIndex + 1 })
+      setNotice(`《${ticket.cardName}》已放入固定卡槽 ${slotIndex + 1}`)
+      return
+    }
+    if (pointInside(redeemZoneRef.current, point)) {
+      if (ticket.state === 'purchased') {
+        setNotice('这张卡还没有刮开，不能兑奖')
+        void updateTicketPlacement(ticket, { ...placement, location: 'desk' })
+      } else if (!ticket.reward) {
+        setNotice('这张卡没有中奖，无法兑奖')
+        void updateTicketPlacement(ticket, { ...placement, location: 'desk' })
+      } else {
+        void redeemTicket(ticket)
+      }
+      return
+    }
+    if (pointInside(trashZoneRef.current, point)) {
+      queueDiscard(ticket)
+      return
+    }
+    void updateTicketPlacement(ticket, { ...placement, location: 'desk' })
+  }
+
+  function queueDiscard(ticket: Ticket) {
+    if (discardTimerRef.current !== null) window.clearTimeout(discardTimerRef.current)
+    if (pendingDiscard) void persistDiscard(pendingDiscard)
+    setTickets((current) => current.filter((item) => item.id !== ticket.id))
+    setPendingDiscard(ticket)
+    setNotice(`《${ticket.cardName}》已放入垃圾桶，5秒内可以撤销`)
+    discardTimerRef.current = window.setTimeout(() => void persistDiscard(ticket), 5000)
+  }
+
+  async function persistDiscard(ticket: Ticket) {
+    discardTimerRef.current = null
+    try {
+      await api.discardTicket(ticket.id)
+      setPendingDiscard((current) => current?.id === ticket.id ? null : current)
+    } catch (error) {
+      setTickets((current) => current.some((item) => item.id === ticket.id) ? current : [ticket, ...current])
+      setPendingDiscard((current) => current?.id === ticket.id ? null : current)
+      setNotice(messageFrom(error))
+    }
+  }
+
+  function undoDiscard() {
+    if (!pendingDiscard) return
+    if (discardTimerRef.current !== null) window.clearTimeout(discardTimerRef.current)
+    discardTimerRef.current = null
+    setTickets((current) => [pendingDiscard, ...current])
+    setNotice(`已撤销丢弃《${pendingDiscard.cardName}》`)
+    setPendingDiscard(null)
   }
 
   if (booting) {
@@ -205,6 +347,10 @@ export function App() {
   }
 
   const firstCard = cards.find((card) => card.code === 'lingqian-ticket')
+  const trayTickets = tickets.filter((ticket) => ticket.location === 'tray')
+  const deskTickets = tickets.filter((ticket) => ticket.location === 'desk')
+  const slotTickets = tickets.filter((ticket) => ticket.location === 'slot')
+  const topZ = Math.max(1, ...deskTickets.map((ticket) => ticket.zIndex))
 
   return (
     <main className="game-shell">
@@ -226,6 +372,19 @@ export function App() {
       <section className="desk">
         <aside className="catalog-panel">
           <div className="panel-title"><span>购卡托盘</span><small>余额达到售价即可购买</small></div>
+          <div className="tray-inventory" aria-label="等待放置的卡片">
+            <div className="tray-heading"><strong>待放到桌面</strong><span>{trayTickets.length} 张</span></div>
+            {trayTickets.length === 0 ? <p>新购买和转盘获得的卡会先放在这里。</p> : (
+              <div className="tray-stack">
+                {trayTickets.slice(0, 8).map((ticket) => (
+                  <button type="button" key={ticket.id} onClick={() => sendToDesk(ticket)} disabled={busy}>
+                    <span>{ticket.cardName}</span><small>{ticket.source === 'daily_wheel' ? '免费卡' : `${ticket.nominalPrice} 金币`}</small><strong>放到桌面 →</strong>
+                  </button>
+                ))}
+                {trayTickets.length > 8 && <small>还有 {trayTickets.length - 8} 张等待放置</small>}
+              </div>
+            )}
+          </div>
           {firstCard && (
             <article className="featured-card">
               <img src={ticketArtwork} alt="零钱小票卡面概念图" />
@@ -261,30 +420,60 @@ export function App() {
             <p>未兑奖卡会一直保留</p>
           </div>
 
-          {tickets.length === 0 ? (
-            <div className="empty-desk">
-              <div>✦</div>
-              <h2>桌面还是空的</h2>
-              <p>购买第一张《零钱小票》，开始完整刮奖流程。</p>
+          <div className="desk-zones">
+            <div className="redeem-drop-zone" ref={redeemZoneRef}>
+              <span>兑奖区</span><strong>中奖卡拖到这里</strong><small>未中奖卡不会被兑换</small>
             </div>
-          ) : (
-            <div className="ticket-grid">
-              {tickets.map((ticket) => (
-                <button
-                  type="button"
-                  className={`desk-ticket state-${ticket.state}`}
-                  key={ticket.id}
-                  onClick={() => openTicket(ticket)}
-                >
-                  <span className="ticket-stamp">{ticket.cardName}</span>
-                  <strong>{ticket.state === 'purchased' ? '等待刮开' : ticket.state === 'redeemed' ? '已兑奖' : '查看结果'}</strong>
-                  <small>{new Date(ticket.createdAt).toLocaleString('zh-CN', { hour12: false })}</small>
-                </button>
-              ))}
+            <div className="trash-drop-zone" ref={trashZoneRef}>
+              <span aria-hidden="true">🗑️</span><strong>垃圾桶</strong><small>拖入后可撤销5秒</small>
             </div>
-          )}
+          </div>
+
+          <section className="fixed-slot-panel" aria-label="固定卡槽">
+            <div className="fixed-slot-heading"><div><span className="eyebrow">PROTECTED STORAGE</span><h2>固定卡槽</h2></div><small>{slotTickets.length} / 10</small></div>
+            <div className="fixed-slots">
+              {Array.from({ length: 10 }, (_, index) => {
+                const slotTicket = slotTickets.find((ticket) => ticket.slotIndex === index + 1)
+                return (
+                  <div className={`fixed-slot ${slotTicket ? 'occupied' : ''}`} key={index} ref={(element) => { slotRefs.current[index] = element }} data-slot-index={index + 1}>
+                    <span>{index + 1}</span>
+                    {slotTicket ? (
+                      <div className="slot-ticket">
+                        <button type="button" onClick={() => openTicket(slotTicket)}>{slotTicket.cardName}</button>
+                        <button type="button" onClick={() => removeFromSlot(slotTicket)} aria-label={`取出${slotTicket.cardName}`}>取出</button>
+                      </div>
+                    ) : <small>拖入保护</small>}
+                  </div>
+                )
+              })}
+            </div>
+          </section>
+
+          <div className="free-desk" ref={deskRef} aria-label="可自由摆放卡片的桌面">
+            {deskTickets.length === 0 && (
+              <div className="empty-free-desk"><span>✦</span><strong>桌面暂无卡片</strong><small>从左侧购卡托盘把卡片放到桌面</small></div>
+            )}
+            {deskTickets.map((ticket) => (
+              <DeskTicket
+                key={ticket.id}
+                ticket={ticket}
+                deskRef={deskRef}
+                topZ={topZ}
+                onOpen={openTicket}
+                onPin={pinToFirstSlot}
+                onDrop={handleTicketDrop}
+              />
+            ))}
+          </div>
         </section>
       </section>
+
+      {pendingDiscard && (
+        <div className="undo-toast" role="status">
+          <span>《{pendingDiscard.cardName}》已放入垃圾桶</span>
+          <button type="button" onClick={undoDiscard}>撤销</button>
+        </div>
+      )}
 
       {activeTicket && (
         <div className="modal-backdrop" role="presentation" onMouseDown={(event) => {
@@ -304,6 +493,11 @@ export function App() {
                 <p>{activeTicket.reward ? '把中奖卡放入兑奖区即可入账。' : '未中奖卡将继续留在桌面，后续可丢入垃圾桶。'}</p>
                 {activeTicket.state === 'scratched' && Boolean(activeTicket.reward) && (
                   <button type="button" className="gold-button" onClick={redeem} disabled={busy}>拖入兑奖区 · 立即兑奖</button>
+                )}
+                {activeTicket.state !== 'redeemed' && activeTicket.location === 'slot' ? (
+                  <button type="button" className="secondary-button" onClick={() => { removeFromSlot(activeTicket); setActiveTicket(null) }} disabled={busy}>从固定卡槽取出</button>
+                ) : activeTicket.state !== 'redeemed' && (
+                  <button type="button" className="secondary-button" onClick={() => pinToFirstSlot(activeTicket)} disabled={busy || slotTickets.length >= 10}>放入固定卡槽</button>
                 )}
                 {activeTicket.state === 'redeemed' && <span className="redeemed-badge">已经兑奖</span>}
               </div>

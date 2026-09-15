@@ -37,6 +37,12 @@ func TestAccountAndTicketLifecycle(t *testing.T) {
 	if len(purchase.Ticket.Symbols) != 0 {
 		t.Fatal("purchase response exposed hidden symbols")
 	}
+	slot := 1
+	if _, err := service.PlaceTicket(ctx, authResult.User.ID, purchase.Ticket.ID, store.TicketPlacement{
+		Location: domain.TicketInSlot, DeskX: .5, DeskY: .4, ZIndex: 2, SlotIndex: &slot,
+	}); err != nil {
+		t.Fatal(err)
+	}
 
 	retry, err := service.Purchase(ctx, purchase.User, "lingqian-ticket", "purchase-test-001")
 	if err != nil {
@@ -60,6 +66,9 @@ func TestAccountAndTicketLifecycle(t *testing.T) {
 	}
 	if result.User.Balance != 950+scratched.Reward {
 		t.Fatalf("unexpected redeemed balance %d", result.User.Balance)
+	}
+	if result.Ticket.SlotIndex != nil {
+		t.Fatal("redeeming a protected ticket did not release its slot")
 	}
 
 	retryRedeem, err := service.Redeem(ctx, authResult.User.ID, purchase.Ticket.ID)
@@ -147,5 +156,56 @@ func TestRegistrationValidation(t *testing.T) {
 	}
 	if _, err := service.Register(context.Background(), "测试玩家", "correct-horse-42", false); !errors.Is(err, ErrInvalidInput) {
 		t.Fatalf("expected age confirmation to be required, got %v", err)
+	}
+}
+
+func TestDeskPlacementSlotsAndDiscard(t *testing.T) {
+	ctx := context.Background()
+	service := New(memory.New())
+	service.drawCard = func(string, uint8) (domain.Outcome, error) {
+		return domain.Outcome{PrizeTier: "none", Symbols: []string{"狗头金币", "钞票", "碎钻石"}}, nil
+	}
+	authResult, err := service.Register(ctx, "桌面玩家", "correct-horse-42", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	first, err := service.Purchase(ctx, authResult.User, "lingqian-ticket", "desk-purchase-001")
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := service.Purchase(ctx, first.User, "lingqian-ticket", "desk-purchase-002")
+	if err != nil {
+		t.Fatal(err)
+	}
+	slot := 1
+	placed, err := service.PlaceTicket(ctx, authResult.User.ID, first.Ticket.ID, store.TicketPlacement{
+		Location: domain.TicketInSlot, DeskX: .3, DeskY: .4, Rotation: -2, ZIndex: 4, SlotIndex: &slot,
+	})
+	if err != nil || placed.SlotIndex == nil || *placed.SlotIndex != 1 {
+		t.Fatalf("place in slot = %#v, %v", placed, err)
+	}
+	if _, err := service.PlaceTicket(ctx, authResult.User.ID, second.Ticket.ID, store.TicketPlacement{
+		Location: domain.TicketInSlot, DeskX: .5, DeskY: .5, ZIndex: 5, SlotIndex: &slot,
+	}); !errors.Is(err, store.ErrSlotOccupied) {
+		t.Fatalf("expected occupied slot error, got %v", err)
+	}
+	if _, err := service.DiscardTicket(ctx, authResult.User.ID, first.Ticket.ID); !errors.Is(err, store.ErrProtected) {
+		t.Fatalf("expected protected ticket error, got %v", err)
+	}
+	placed, err = service.PlaceTicket(ctx, authResult.User.ID, first.Ticket.ID, store.TicketPlacement{
+		Location: domain.TicketOnDesk, DeskX: .72, DeskY: .28, Rotation: 4, ZIndex: 8,
+	})
+	if err != nil || placed.Location != domain.TicketOnDesk || placed.SlotIndex != nil {
+		t.Fatalf("return to desk = %#v, %v", placed, err)
+	}
+	if _, err := service.DiscardTicket(ctx, authResult.User.ID, first.Ticket.ID); err != nil {
+		t.Fatal(err)
+	}
+	tickets, err := service.Tickets(ctx, authResult.User.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(tickets) != 1 || tickets[0].ID != second.Ticket.ID {
+		t.Fatalf("discarded ticket remained visible: %#v", tickets)
 	}
 }

@@ -174,6 +174,10 @@ func (store *Store) PurchaseTicket(ctx context.Context, input basestore.CreateTi
 		Reward:      input.Outcome.Reward,
 		Symbols:     append([]string(nil), input.Outcome.Symbols...),
 		State:       domain.TicketPurchased,
+		Location:    domain.TicketInTray,
+		DeskX:       .5,
+		DeskY:       .35,
+		ZIndex:      1,
 		PurchaseKey: input.PurchaseKey,
 		CreatedAt:   time.Now().UTC(),
 	}
@@ -184,9 +188,10 @@ func (store *Store) ListTickets(ctx context.Context, userID uint64) ([]domain.Ti
 	rows, err := store.db.QueryContext(ctx, `
 		SELECT id, user_id, card_code, card_name, source, purchase_key, price, price_paid,
 			COALESCE(DATE_FORMAT(wheel_date, '%Y-%m-%d'), ''), luck_level,
-			prize_tier, reward, symbols, state, created_at, scratched_at, redeemed_at
+			prize_tier, reward, symbols, state, location, desk_x, desk_y, rotation, z_index, slot_index,
+			created_at, scratched_at, redeemed_at, discarded_at
 		FROM tickets
-		WHERE user_id = ? AND state <> 'discarded'
+		WHERE user_id = ? AND state IN ('purchased', 'scratched')
 		ORDER BY created_at DESC
 		LIMIT 200`, userID)
 	if err != nil {
@@ -267,7 +272,7 @@ func (store *Store) RedeemTicket(ctx context.Context, userID uint64, ticketID st
 	}
 	now := time.Now().UTC()
 	if _, err := tx.ExecContext(ctx,
-		`UPDATE tickets SET state = 'redeemed', redeemed_at = ? WHERE id = ?`, now, ticket.ID,
+		`UPDATE tickets SET state = 'redeemed', slot_index = NULL, redeemed_at = ? WHERE id = ?`, now, ticket.ID,
 	); err != nil {
 		return domain.User{}, domain.Ticket{}, false, err
 	}
@@ -281,6 +286,7 @@ func (store *Store) RedeemTicket(ctx context.Context, userID uint64, ticketID st
 		return domain.User{}, domain.Ticket{}, false, err
 	}
 	ticket.State = domain.TicketRedeemed
+	ticket.SlotIndex = nil
 	ticket.RedeemedAt = &now
 	if err := tx.Commit(); err != nil {
 		return domain.User{}, domain.Ticket{}, false, err
@@ -535,6 +541,10 @@ func (store *Store) SpinDailyWheel(ctx context.Context, userID uint64, date, tic
 		Reward:    selection.Outcome.Reward,
 		Symbols:   append([]string(nil), selection.Outcome.Symbols...),
 		State:     domain.TicketPurchased,
+		Location:  domain.TicketInTray,
+		DeskX:     .5,
+		DeskY:     .35,
+		ZIndex:    1,
 		CreatedAt: now,
 	}
 	daily.WheelUsed = true
@@ -553,6 +563,74 @@ func (store *Store) DeleteExpiredSessions(ctx context.Context, cutoff time.Time)
 	return err
 }
 
+func (store *Store) UpdateTicketPlacement(ctx context.Context, userID uint64, ticketID string, placement basestore.TicketPlacement) (domain.Ticket, error) {
+	tx, err := store.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
+	if err != nil {
+		return domain.Ticket{}, err
+	}
+	defer tx.Rollback()
+	ticket, err := lockedTicket(ctx, tx, userID, ticketID)
+	if err != nil {
+		return domain.Ticket{}, err
+	}
+	if ticket.State != domain.TicketPurchased && ticket.State != domain.TicketScratched {
+		return domain.Ticket{}, basestore.ErrInvalidState
+	}
+	_, err = tx.ExecContext(ctx, `
+		UPDATE tickets
+		SET location = ?, desk_x = ?, desk_y = ?, rotation = ?, z_index = ?, slot_index = ?
+		WHERE id = ?`,
+		placement.Location, placement.DeskX, placement.DeskY, placement.Rotation, placement.ZIndex, placement.SlotIndex, ticketID,
+	)
+	if err != nil {
+		var mysqlErr *mysqldriver.MySQLError
+		if errors.As(err, &mysqlErr) && mysqlErr.Number == 1062 {
+			return domain.Ticket{}, basestore.ErrSlotOccupied
+		}
+		return domain.Ticket{}, err
+	}
+	ticket.Location = placement.Location
+	ticket.DeskX = placement.DeskX
+	ticket.DeskY = placement.DeskY
+	ticket.Rotation = placement.Rotation
+	ticket.ZIndex = placement.ZIndex
+	ticket.SlotIndex = placement.SlotIndex
+	if err := tx.Commit(); err != nil {
+		return domain.Ticket{}, err
+	}
+	return publicTicket(ticket), nil
+}
+
+func (store *Store) DiscardTicket(ctx context.Context, userID uint64, ticketID string, discardedAt time.Time) (domain.Ticket, error) {
+	tx, err := store.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
+	if err != nil {
+		return domain.Ticket{}, err
+	}
+	defer tx.Rollback()
+	ticket, err := lockedTicket(ctx, tx, userID, ticketID)
+	if err != nil {
+		return domain.Ticket{}, err
+	}
+	if ticket.Location == domain.TicketInSlot {
+		return domain.Ticket{}, basestore.ErrProtected
+	}
+	if ticket.State != domain.TicketPurchased && ticket.State != domain.TicketScratched {
+		return domain.Ticket{}, basestore.ErrInvalidState
+	}
+	if _, err := tx.ExecContext(ctx, `
+		UPDATE tickets SET state = 'discarded', slot_index = NULL, discarded_at = ? WHERE id = ?`, discardedAt.UTC(), ticketID,
+	); err != nil {
+		return domain.Ticket{}, err
+	}
+	ticket.State = domain.TicketDiscarded
+	ticket.SlotIndex = nil
+	ticket.DiscardedAt = &discardedAt
+	if err := tx.Commit(); err != nil {
+		return domain.Ticket{}, err
+	}
+	return revealTicket(ticket), nil
+}
+
 type scanner interface {
 	Scan(...any) error
 }
@@ -565,10 +643,13 @@ func scanTicket(row scanner) (domain.Ticket, error) {
 	var ticket domain.Ticket
 	var symbolsJSON []byte
 	var state string
+	var location string
+	var slotIndex sql.NullInt64
 	err := row.Scan(
 		&ticket.ID, &ticket.UserID, &ticket.CardCode, &ticket.CardName, &ticket.Source, &ticket.PurchaseKey,
 		&ticket.Price, &ticket.PricePaid, &ticket.WheelDate, &ticket.LuckLevel, &ticket.PrizeTier, &ticket.Reward, &symbolsJSON,
-		&state, &ticket.CreatedAt, &ticket.ScratchedAt, &ticket.RedeemedAt,
+		&state, &location, &ticket.DeskX, &ticket.DeskY, &ticket.Rotation, &ticket.ZIndex, &slotIndex,
+		&ticket.CreatedAt, &ticket.ScratchedAt, &ticket.RedeemedAt, &ticket.DiscardedAt,
 	)
 	if err != nil {
 		return domain.Ticket{}, err
@@ -577,6 +658,11 @@ func scanTicket(row scanner) (domain.Ticket, error) {
 		return domain.Ticket{}, err
 	}
 	ticket.State = domain.TicketState(state)
+	ticket.Location = domain.TicketLocation(location)
+	if slotIndex.Valid {
+		value := int(slotIndex.Int64)
+		ticket.SlotIndex = &value
+	}
 	return ticket, nil
 }
 
@@ -596,7 +682,8 @@ func ticketByPurchaseKey(ctx context.Context, tx *sql.Tx, userID uint64, key str
 	ticket, err := scanTicket(tx.QueryRowContext(ctx, `
 		SELECT id, user_id, card_code, card_name, source, purchase_key, price, price_paid,
 			COALESCE(DATE_FORMAT(wheel_date, '%Y-%m-%d'), ''), luck_level,
-			prize_tier, reward, symbols, state, created_at, scratched_at, redeemed_at
+			prize_tier, reward, symbols, state, location, desk_x, desk_y, rotation, z_index, slot_index,
+			created_at, scratched_at, redeemed_at, discarded_at
 		FROM tickets WHERE user_id = ? AND purchase_key = ?`, userID, key))
 	if errors.Is(err, sql.ErrNoRows) {
 		return domain.Ticket{}, basestore.ErrNotFound
@@ -608,7 +695,8 @@ func lockedTicket(ctx context.Context, tx *sql.Tx, userID uint64, ticketID strin
 	ticket, err := scanTicket(tx.QueryRowContext(ctx, `
 		SELECT id, user_id, card_code, card_name, source, purchase_key, price, price_paid,
 			COALESCE(DATE_FORMAT(wheel_date, '%Y-%m-%d'), ''), luck_level,
-			prize_tier, reward, symbols, state, created_at, scratched_at, redeemed_at
+			prize_tier, reward, symbols, state, location, desk_x, desk_y, rotation, z_index, slot_index,
+			created_at, scratched_at, redeemed_at, discarded_at
 		FROM tickets WHERE id = ? AND user_id = ? FOR UPDATE`, ticketID, userID))
 	if errors.Is(err, sql.ErrNoRows) {
 		return domain.Ticket{}, basestore.ErrNotFound

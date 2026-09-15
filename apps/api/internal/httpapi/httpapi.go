@@ -36,6 +36,15 @@ type credentialsRequest struct {
 	AgeConfirmed bool   `json:"ageConfirmed,omitempty"`
 }
 
+type placementRequest struct {
+	Location  domain.TicketLocation `json:"location"`
+	DeskX     float64               `json:"deskX"`
+	DeskY     float64               `json:"deskY"`
+	Rotation  float64               `json:"rotation"`
+	ZIndex    int                   `json:"zIndex"`
+	SlotIndex *int                  `json:"slotIndex"`
+}
+
 type errorResponse struct {
 	Error struct {
 		Code    string `json:"code"`
@@ -58,6 +67,8 @@ func New(service *service.Service, store store.Store, logger *slog.Logger, cooki
 	mux.Handle("GET /api/v1/tickets", api.requireUser(http.HandlerFunc(api.tickets)))
 	mux.Handle("POST /api/v1/tickets/{id}/scratch", api.requireUser(http.HandlerFunc(api.scratch)))
 	mux.Handle("POST /api/v1/tickets/{id}/redeem", api.requireUser(http.HandlerFunc(api.redeem)))
+	mux.Handle("PATCH /api/v1/tickets/{id}/placement", api.requireUser(http.HandlerFunc(api.placeTicket)))
+	mux.Handle("POST /api/v1/tickets/{id}/discard", api.requireUser(http.HandlerFunc(api.discardTicket)))
 	mux.Handle("GET /api/v1/daily", api.requireUser(http.HandlerFunc(api.dailyStatus)))
 	mux.Handle("POST /api/v1/daily/login-claim", api.requireUser(http.HandlerFunc(api.claimDailyLogin)))
 	mux.Handle("POST /api/v1/daily/plates/start", api.requireUser(http.HandlerFunc(api.startPlate)))
@@ -182,6 +193,32 @@ func (api *API) redeem(response http.ResponseWriter, request *http.Request) {
 	writeJSON(response, http.StatusOK, result)
 }
 
+func (api *API) placeTicket(response http.ResponseWriter, request *http.Request) {
+	var body placementRequest
+	if err := decodeJSON(request, &body); err != nil {
+		api.writeError(response, request, service.ErrInvalidInput)
+		return
+	}
+	ticket, err := api.service.PlaceTicket(request.Context(), currentUser(request).ID, request.PathValue("id"), store.TicketPlacement{
+		Location: body.Location, DeskX: body.DeskX, DeskY: body.DeskY,
+		Rotation: body.Rotation, ZIndex: body.ZIndex, SlotIndex: body.SlotIndex,
+	})
+	if err != nil {
+		api.writeError(response, request, err)
+		return
+	}
+	writeJSON(response, http.StatusOK, map[string]any{"ticket": ticket})
+}
+
+func (api *API) discardTicket(response http.ResponseWriter, request *http.Request) {
+	ticket, err := api.service.DiscardTicket(request.Context(), currentUser(request).ID, request.PathValue("id"))
+	if err != nil {
+		api.writeError(response, request, err)
+		return
+	}
+	writeJSON(response, http.StatusOK, map[string]any{"ticket": ticket})
+}
+
 func (api *API) dailyStatus(response http.ResponseWriter, request *http.Request) {
 	status, err := api.service.DailyStatus(request.Context(), currentUser(request))
 	if err != nil {
@@ -276,6 +313,10 @@ func (api *API) writeError(response http.ResponseWriter, request *http.Request, 
 		writeAPIError(response, http.StatusConflict, "invalid_state", "当前状态不能执行该操作")
 	case errors.Is(err, store.ErrNotWinner):
 		writeAPIError(response, http.StatusUnprocessableEntity, "not_winner", "该卡未中奖，无法兑奖")
+	case errors.Is(err, store.ErrSlotOccupied):
+		writeAPIError(response, http.StatusConflict, "slot_occupied", "这个固定卡槽已经有卡片")
+	case errors.Is(err, store.ErrProtected):
+		writeAPIError(response, http.StatusConflict, "ticket_protected", "固定卡槽中的卡片不能丢弃")
 	case errors.Is(err, store.ErrDailyLimit):
 		writeAPIError(response, http.StatusConflict, "daily_limit", "今天的次数已经用完")
 	case errors.Is(err, store.ErrTooEarly):

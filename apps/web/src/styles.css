@@ -150,6 +150,8 @@ button { color: inherit; }
 }
 
 .gold-button:disabled { opacity: .5; cursor: not-allowed; filter: grayscale(.4); }
+.secondary-button { width: min(100%, 360px); min-height: 43px; margin: 10px auto 0; padding: 9px 15px; border: 1px solid #7b704e; border-radius: 9px; color: #d7cda8; background: rgba(18,48,38,.75); font-weight: 800; cursor: pointer; }
+.secondary-button:disabled { opacity: .45; cursor: not-allowed; }
 
 .game-shell {
   min-height: 100vh;
@@ -220,6 +222,18 @@ button { color: inherit; }
 .panel-title { display: grid; gap: 3px; padding: 20px 22px; border-bottom: 1px solid rgba(218,179,87,.25); }
 .panel-title span { font-family: Georgia, "Songti SC", serif; color: #f3d37d; font-size: 22px; font-weight: 800; }
 .panel-title small { color: #999580; }
+.tray-inventory { margin: 14px; overflow: hidden; border: 1px solid rgba(218,179,87,.3); border-radius: 12px; background: rgba(0,0,0,.18); }
+.tray-heading { display: flex; align-items: center; justify-content: space-between; padding: 11px 13px; border-bottom: 1px solid rgba(255,255,255,.06); }
+.tray-heading strong { color: #e5cd88; font-size: 13px; }
+.tray-heading span { min-width: 48px; padding: 3px 8px; border-radius: 99px; color: #173126; background: #c9a94e; font-size: 11px; font-weight: 900; text-align: center; }
+.tray-inventory > p { margin: 0; padding: 13px; color: #858477; font-size: 12px; line-height: 1.5; }
+.tray-stack { display: grid; padding: 7px; }
+.tray-stack > button { display: grid; grid-template-columns: 1fr auto; gap: 3px 10px; padding: 10px; border: 0; border-bottom: 1px solid rgba(255,255,255,.05); color: inherit; background: transparent; text-align: left; cursor: pointer; }
+.tray-stack > button:hover { background: rgba(255,255,255,.045); }
+.tray-stack > button span { font-weight: 800; }
+.tray-stack > button small { color: #8f8d7d; }
+.tray-stack > button strong { grid-column: 2; grid-row: 1 / 3; align-self: center; color: #d7b65e; font-size: 11px; }
+.tray-stack > small { padding: 8px; color: #8e8b7d; text-align: center; }
 .featured-card { padding: 18px; }
 .featured-card img { display: block; width: 100%; aspect-ratio: 2 / 1; object-fit: cover; border: 1px solid #b18a43; border-radius: 10px; box-shadow: 0 14px 30px rgba(0,0,0,.35); }
 .featured-copy { display: grid; gap: 12px; padding-top: 16px; }
@@ -246,6 +260,52 @@ button { color: inherit; }
 .empty-desk > div { color: #e5c56f; font-size: 48px; }
 .empty-desk h2 { margin: 12px 0 4px; }
 .empty-desk p { color: #cbbd9b; }
+.desk-zones { display: grid; grid-template-columns: 1fr 170px; gap: 14px; margin-bottom: 14px; }
+.redeem-drop-zone, .trash-drop-zone { min-height: 78px; display: grid; align-content: center; gap: 2px; padding: 13px 18px; border-radius: 12px; transition: border-color .2s, background .2s; }
+.redeem-drop-zone { border: 2px dashed #a98747; background: linear-gradient(90deg, rgba(24,66,50,.82), rgba(10,40,31,.78)); }
+.redeem-drop-zone span { color: #f0cf75; font-family: Georgia, "Songti SC", serif; font-size: 20px; font-weight: 900; }
+.redeem-drop-zone strong { font-size: 12px; }
+.redeem-drop-zone small, .trash-drop-zone small { color: #8e8c7e; font-size: 10px; }
+.trash-drop-zone { grid-template-columns: 44px 1fr; border: 2px dashed #84665b; background: rgba(42,25,20,.66); }
+.trash-drop-zone > span { grid-row: 1 / 3; align-self: center; font-size: 31px; }
+.trash-drop-zone strong { align-self: end; }
+
+.free-desk { position: relative; min-height: clamp(480px, 53vw, 690px); border: 1px solid rgba(118,67,36,.72); border-radius: 18px; background: radial-gradient(circle at 70% 12%, rgba(255,215,133,.13), transparent 25%), repeating-linear-gradient(2deg, transparent 0 64px, rgba(30,10,3,.09) 65px 67px), linear-gradient(120deg, #6b351b, #3d1d10 52%, #7a4221); box-shadow: inset 0 16px 34px rgba(0,0,0,.28), 0 18px 35px rgba(0,0,0,.2); }
+.free-desk::after { content: ""; position: absolute; inset: 0; border-radius: inherit; background: repeating-linear-gradient(92deg, transparent 0 110px, rgba(255,255,255,.012) 111px 112px); pointer-events: none; }
+.empty-free-desk { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 7px; color: #c7ad76; pointer-events: none; }
+.empty-free-desk span { font-size: 38px; }
+.empty-free-desk small { color: #aa916a; }
+
+.movable-ticket { position: absolute; width: clamp(190px, 24vw, 260px); aspect-ratio: 2 / 1; display: grid; grid-template-rows: auto 1fr auto; gap: 7px; padding: 15px 17px; border: 2px solid #c09a4f; border-radius: 9px; color: #183425; background: linear-gradient(145deg, #d5dfaf, #f0e5b8 55%, #a8bd84); box-shadow: 0 15px 22px rgba(0,0,0,.38); user-select: none; touch-action: none; cursor: grab; outline: none; }
+.movable-ticket:focus-visible { box-shadow: 0 0 0 4px rgba(238,205,115,.45), 0 15px 22px rgba(0,0,0,.38); }
+.movable-ticket.dragging { cursor: grabbing; filter: brightness(1.06); box-shadow: 0 25px 36px rgba(0,0,0,.5); }
+.movable-ticket-name { font-family: Georgia, "Songti SC", serif; font-size: 18px; font-weight: 900; }
+.movable-ticket-scratch { display: grid; place-items: center; border: 1px dashed rgba(43,70,49,.43); border-radius: 5px; background: rgba(255,255,255,.24); font-size: 13px; font-weight: 900; }
+.movable-ticket > small { opacity: .65; font-size: 10px; }
+.ticket-pin { position: absolute; right: 28px; top: 7px; min-height: 24px; padding: 2px 8px; border: 1px solid rgba(39,67,46,.42); border-radius: 99px; color: inherit; background: rgba(255,255,255,.26); font-size: 10px; font-weight: 900; cursor: pointer; }
+.ticket-pin:hover, .ticket-pin:focus-visible { background: rgba(255,255,255,.48); outline: none; }
+.drag-grip { position: absolute; right: 8px; top: 6px; opacity: .4; font-style: normal; }
+.movable-ticket.card-street-store { background: linear-gradient(145deg, #f1b76d, #f6e0a4 60%, #d37b4f); }
+.movable-ticket.card-arcade-challenge { color: #ece6ff; background: linear-gradient(145deg, #4c3f8d, #9b4b92 55%, #283b73); }
+.movable-ticket.card-gold-mine { color: #3c2a12; background: linear-gradient(145deg, #ad7a35, #f1d783 58%, #7c5525); }
+.movable-ticket.card-rocket-launch { color: #e9f2ff; background: linear-gradient(145deg, #243866, #7089b3 58%, #192747); }
+.movable-ticket.card-deep-sea-salvage { color: #e7f6ef; background: linear-gradient(145deg, #174c58, #428e88 55%, #153d4c); }
+
+.fixed-slot-panel { position: sticky; z-index: 12; top: 84px; margin: 0 0 16px; padding: 16px; border: 1px solid #6f5b37; border-radius: 15px; background: linear-gradient(145deg, rgba(16,45,37,.98), rgba(7,26,22,.98)); box-shadow: 0 16px 28px rgba(0,0,0,.32); }
+.fixed-slot-heading { display: flex; align-items: end; justify-content: space-between; margin-bottom: 12px; }
+.fixed-slot-heading h2 { margin: 3px 0 0; font-family: Georgia, "Songti SC", serif; }
+.fixed-slot-heading > small { color: #d9bb68; }
+.fixed-slots { display: grid; grid-template-columns: repeat(5, 1fr); gap: 9px; }
+.fixed-slot { position: relative; min-height: 84px; display: grid; place-items: center; border: 1px dashed #596c5f; border-radius: 9px; color: #777f72; background: rgba(0,0,0,.16); }
+.fixed-slot > span { position: absolute; top: 5px; left: 7px; font-size: 10px; }
+.fixed-slot > small { font-size: 10px; }
+.fixed-slot.occupied { border-style: solid; border-color: #a88745; background: rgba(156,119,52,.12); }
+.slot-ticket { width: 100%; display: grid; gap: 4px; padding: 16px 6px 5px; }
+.slot-ticket button { min-height: 25px; padding: 4px; border: 0; border-radius: 5px; color: #e9d99f; background: rgba(29,73,56,.8); font-size: 10px; cursor: pointer; }
+.slot-ticket button:last-child { color: #999685; background: transparent; }
+
+.undo-toast { position: fixed; z-index: 120; right: 22px; bottom: 22px; display: flex; align-items: center; gap: 18px; max-width: calc(100vw - 44px); padding: 13px 15px 13px 18px; border: 1px solid #99784a; border-radius: 12px; color: #e9dfbd; background: #112d25; box-shadow: 0 18px 40px rgba(0,0,0,.45); }
+.undo-toast button { padding: 7px 12px; border: 1px solid #d2ae59; border-radius: 7px; color: #f0d57d; background: transparent; font-weight: 900; cursor: pointer; }
 .ticket-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 24px; }
 .desk-ticket { position: relative; min-height: 160px; display: flex; flex-direction: column; align-items: start; justify-content: end; gap: 7px; padding: 20px; overflow: hidden; border: 1px solid #c5a358; border-radius: 10px; color: #173526; background: linear-gradient(145deg, #a9bd87, #e7dba9 60%, #8da46f); box-shadow: 0 18px 28px rgba(0,0,0,.3); text-align: left; cursor: pointer; transform: rotate(-1deg); }
 .desk-ticket::after { content: ""; position: absolute; inset: 0; background: repeating-linear-gradient(45deg, transparent 0 13px, rgba(255,255,255,.08) 14px 15px); pointer-events: none; }
@@ -427,6 +487,8 @@ button { color: inherit; }
   .table-area { order: 1; }
   .table-heading { margin-bottom: 18px; }
   .empty-desk { min-height: 250px; }
+  .free-desk { min-height: 560px; }
+  .movable-ticket { width: clamp(175px, 34vw, 230px); }
   .daily-grid, .wheel-section { grid-template-columns: 1fr; }
   .wheel-section { padding: 24px 18px; }
   .wheel-visual { width: min(280px, 82vw); }
@@ -443,6 +505,17 @@ button { color: inherit; }
   .desk { min-height: calc(100vh - 64px); }
   .table-heading p { display: none; }
   .ticket-grid { grid-template-columns: 1fr; }
+  .desk-zones { grid-template-columns: 1fr 115px; }
+  .redeem-drop-zone, .trash-drop-zone { min-height: 68px; padding: 10px 12px; }
+  .trash-drop-zone { grid-template-columns: 33px 1fr; }
+  .trash-drop-zone > span { font-size: 24px; }
+  .free-desk { min-height: 470px; border-radius: 13px; }
+  .movable-ticket { width: min(190px, 58vw); padding: 12px 14px; }
+  .movable-ticket-name { font-size: 16px; }
+  .fixed-slot-panel { position: relative; top: auto; padding: 12px; }
+  .fixed-slots { grid-template-columns: repeat(2, 1fr); }
+  .fixed-slot { min-height: 66px; }
+  .undo-toast { right: 12px; bottom: 12px; max-width: calc(100vw - 24px); }
   .featured-card { padding: 14px; }
   .scratch-dialog { padding: 48px 14px 20px; border-radius: 16px; }
   .ticket-heading { display: grid; gap: 4px; padding: 12px; }

@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
+	"math"
 	"regexp"
 	"strings"
 	"time"
@@ -278,6 +279,20 @@ func (service *Service) Redeem(ctx context.Context, userID uint64, ticketID stri
 	return RedeemResult{User: user, Ticket: ticket, Idempotent: idempotent}, nil
 }
 
+func (service *Service) PlaceTicket(ctx context.Context, userID uint64, ticketID string, placement store.TicketPlacement) (domain.Ticket, error) {
+	if !validTicketID(ticketID) || !validPlacement(placement) {
+		return domain.Ticket{}, ErrInvalidInput
+	}
+	return service.store.UpdateTicketPlacement(ctx, userID, ticketID, placement)
+}
+
+func (service *Service) DiscardTicket(ctx context.Context, userID uint64, ticketID string) (domain.Ticket, error) {
+	if !validTicketID(ticketID) {
+		return domain.Ticket{}, ErrInvalidInput
+	}
+	return service.store.DiscardTicket(ctx, userID, ticketID, service.now().UTC())
+}
+
 func (service *Service) createSession(ctx context.Context, user domain.User) (AuthResult, error) {
 	now := service.now().UTC()
 	token, session, err := auth.NewSession(user.ID, now)
@@ -321,6 +336,22 @@ func validTicketID(ticketID string) bool {
 	}
 	_, err := hex.DecodeString(ticketID)
 	return err == nil
+}
+
+func validPlacement(placement store.TicketPlacement) bool {
+	if placement.Location != domain.TicketOnDesk && placement.Location != domain.TicketInSlot {
+		return false
+	}
+	if math.IsNaN(placement.DeskX) || math.IsInf(placement.DeskX, 0) || placement.DeskX < 0 || placement.DeskX > 1 ||
+		math.IsNaN(placement.DeskY) || math.IsInf(placement.DeskY, 0) || placement.DeskY < 0 || placement.DeskY > 1 ||
+		math.IsNaN(placement.Rotation) || math.IsInf(placement.Rotation, 0) || placement.Rotation < -15 || placement.Rotation > 15 ||
+		placement.ZIndex < 1 || placement.ZIndex > 1_000_000_000 {
+		return false
+	}
+	if placement.Location == domain.TicketInSlot {
+		return placement.SlotIndex != nil && *placement.SlotIndex >= 1 && *placement.SlotIndex <= 10
+	}
+	return placement.SlotIndex == nil
 }
 
 func randomID() (string, error) {

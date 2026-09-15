@@ -17,6 +17,8 @@ var (
 	ErrDailyLimit        = errors.New("daily limit reached")
 	ErrTooEarly          = errors.New("action completed too early")
 	ErrWheelUnavailable  = errors.New("wheel is unavailable")
+	ErrSlotOccupied      = errors.New("card slot is occupied")
+	ErrProtected         = errors.New("protected ticket cannot be discarded")
 )
 
 type CreateTicketInput struct {
@@ -40,6 +42,15 @@ type WheelSelection struct {
 
 type WheelDrawFunc func(balance int64, luckLevel uint8) (WheelSelection, error)
 
+type TicketPlacement struct {
+	Location  domain.TicketLocation
+	DeskX     float64
+	DeskY     float64
+	Rotation  float64
+	ZIndex    int
+	SlotIndex *int
+}
+
 type Store interface {
 	Ping(context.Context) error
 	CreateUser(context.Context, string, string, int64) (domain.User, error)
@@ -51,6 +62,8 @@ type Store interface {
 	ListTickets(context.Context, uint64) ([]domain.Ticket, error)
 	ScratchTicket(context.Context, uint64, string) (domain.Ticket, error)
 	RedeemTicket(context.Context, uint64, string) (domain.User, domain.Ticket, bool, error)
+	UpdateTicketPlacement(context.Context, uint64, string, TicketPlacement) (domain.Ticket, error)
+	DiscardTicket(context.Context, uint64, string, time.Time) (domain.Ticket, error)
 	DailyStatus(context.Context, uint64, string) (domain.DailyStatus, error)
 	ClaimDailyLogin(context.Context, uint64, string, int64) (domain.User, domain.DailyStatus, bool, error)
 	StartPlate(context.Context, uint64, string, domain.PlateAction) (domain.DailyStatus, bool, error)
