@@ -1,0 +1,17 @@
+{
+  "name": "guaguale",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/web"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace @guaguale/web",
+    "build": "npm run build --workspace @guaguale/web",
+    "typecheck": "npm run typecheck --workspace @guaguale/web"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  }
+}
+
