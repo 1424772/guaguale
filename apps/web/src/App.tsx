@@ -461,12 +461,7 @@ function DailyTasksDialog({
               <small>{daily.platesCompleted} / {daily.plateLimit} 已完成</small>
             </div>
             {daily.activePlate ? (
-              <PlateCleaning
-                actionId={daily.activePlate.id}
-                availableAt={daily.activePlate.availableAt}
-                busy={busy}
-                onComplete={onCompletePlate}
-              />
+              <div className="plate-active-label"><span className="plate-bubble">◌</span>正在清洗第 {daily.activePlate.sequence} 个盘子</div>
             ) : (
               <button className="task-button" type="button" onClick={onStartPlate} disabled={busy || platesDone}>
                 {platesDone ? '今日已完成 ✓' : `清洗第 ${daily.platesCompleted + 1} 个`}
@@ -474,6 +469,17 @@ function DailyTasksDialog({
             )}
           </article>
         </div>
+
+        {daily.activePlate && (
+          <PlateCleaning
+            actionId={daily.activePlate.id}
+            sequence={daily.activePlate.sequence}
+            plateLimit={daily.plateLimit}
+            availableAt={daily.activePlate.availableAt}
+            busy={busy}
+            onComplete={onCompletePlate}
+          />
+        )}
 
         <section className="wheel-section">
           <div className="wheel-visual" aria-label="每日免费卡转盘">

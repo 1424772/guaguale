@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 
 type PlateCleaningProps = {
   actionId: string
+  sequence: number
+  plateLimit: number
   availableAt: string
   busy: boolean
   onComplete: (actionId: string) => void
@@ -11,12 +13,14 @@ const canvasWidth = 420
 const canvasHeight = 190
 const completionThreshold = 68
 
-export function PlateCleaning({ actionId, availableAt, busy, onComplete }: PlateCleaningProps) {
+export function PlateCleaning({ actionId, sequence, plateLimit, availableAt, busy, onComplete }: PlateCleaningProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const drawingRef = useRef(false)
   const completedRef = useRef(false)
+  const movementCountRef = useRef(0)
   const completionTimerRef = useRef<number | null>(null)
   const [progress, setProgress] = useState(0)
+  const [sponge, setSponge] = useState({ x: canvasWidth / 2, y: canvasHeight / 2, visible: false, active: false })
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -29,6 +33,7 @@ export function PlateCleaning({ actionId, availableAt, busy, onComplete }: Plate
 
     completedRef.current = false
     drawingRef.current = false
+    movementCountRef.current = 0
     setProgress(0)
     context.scale(ratio, ratio)
     context.save()
@@ -38,10 +43,16 @@ export function PlateCleaning({ actionId, availableAt, busy, onComplete }: Plate
     context.fillStyle = 'rgba(91, 70, 52, .76)'
     context.fillRect(0, 0, canvasWidth, canvasHeight)
 
-    const stains = [
-      [76, 65, 28], [132, 112, 38], [205, 70, 33], [276, 118, 42], [344, 63, 30],
-      [52, 142, 22], [181, 145, 25], [326, 147, 21], [250, 38, 17],
-    ]
+    const seed = [...actionId].reduce((value, character) => value + character.charCodeAt(0), 0)
+    const stains = Array.from({ length: 11 }, (_, index) => {
+      const angle = ((index * 137 + seed) % 360) * Math.PI / 180
+      const distance = 22 + ((index * 31 + seed) % 120)
+      return [
+        canvasWidth / 2 + Math.cos(angle) * distance,
+        canvasHeight / 2 + Math.sin(angle) * distance * .42,
+        15 + ((index * 17 + seed) % 24),
+      ]
+    })
     for (const [x, y, radius] of stains) {
       const stain = context.createRadialGradient(x, y, 3, x, y, radius)
       stain.addColorStop(0, 'rgba(62, 35, 19, .98)')
@@ -52,10 +63,13 @@ export function PlateCleaning({ actionId, availableAt, busy, onComplete }: Plate
       context.arc(x, y, radius, 0, Math.PI * 2)
       context.fill()
     }
-    context.fillStyle = 'rgba(236, 208, 145, .82)'
-    context.font = '800 15px system-ui'
-    context.textAlign = 'center'
-    context.fillText('按住抹布，擦掉残渣', canvasWidth / 2, canvasHeight / 2 + 5)
+    context.strokeStyle = 'rgba(63, 37, 20, .66)'
+    context.lineWidth = 10
+    context.lineCap = 'round'
+    context.beginPath()
+    context.moveTo(110, 80)
+    context.bezierCurveTo(165, 45, 238, 138, 320, 83)
+    context.stroke()
     context.restore()
     context.globalCompositeOperation = 'destination-out'
 
@@ -65,17 +79,20 @@ export function PlateCleaning({ actionId, availableAt, busy, onComplete }: Plate
   }, [actionId])
 
   function wipe(event: React.PointerEvent<HTMLCanvasElement>) {
-    if (!drawingRef.current || completedRef.current || busy) return
     const canvas = canvasRef.current
-    const context = canvas?.getContext('2d', { willReadFrequently: true })
-    if (!canvas || !context) return
+    if (!canvas) return
     const bounds = canvas.getBoundingClientRect()
     const x = (event.clientX - bounds.left) * (canvasWidth / bounds.width)
     const y = (event.clientY - bounds.top) * (canvasHeight / bounds.height)
+    setSponge({ x, y, visible: true, active: drawingRef.current })
+    if (!drawingRef.current || completedRef.current || busy) return
+    const context = canvas.getContext('2d', { willReadFrequently: true })
+    if (!context) return
     context.beginPath()
     context.arc(x, y, 25, 0, Math.PI * 2)
     context.fill()
-    if (event.timeStamp % 3 < 1) measure(context, canvas)
+    movementCountRef.current++
+    if (movementCountRef.current % 3 === 0) measure(context, canvas)
   }
 
   function measure(context: CanvasRenderingContext2D, canvas: HTMLCanvasElement) {
@@ -111,25 +128,64 @@ export function PlateCleaning({ actionId, availableAt, busy, onComplete }: Plate
   }
 
   return (
-    <div className="plate-cleaning">
-      <div className="plate-surface">
-        <div className="clean-plate" aria-hidden="true"><span>✦</span></div>
-        <canvas
-          ref={canvasRef}
-          className="plate-dirt"
-          aria-label="脏盘子清洁区域"
-          onPointerDown={(event) => {
-            drawingRef.current = true
-            event.currentTarget.setPointerCapture(event.pointerId)
-            wipe(event)
-          }}
-          onPointerMove={wipe}
-          onPointerUp={() => { drawingRef.current = false }}
-          onPointerCancel={() => { drawingRef.current = false }}
-        />
+    <section className={`plate-cleaning ${progress >= completionThreshold ? 'plate-cleaned' : ''}`} aria-labelledby="wash-title">
+      <header className="wash-header">
+        <div>
+          <span className="eyebrow">DISHWASHING MINI GAME</span>
+          <h2 id="wash-title">把盘子擦干净</h2>
+          <p>按住海绵来回擦洗残渣，清洁度达到 {completionThreshold}% 即可获得 5 金币。</p>
+        </div>
+        <div className="wash-count"><span>今日进度</span><strong>{sequence} / {plateLimit}</strong></div>
+      </header>
+
+      <div className="sink-station">
+        <div className="faucet" aria-hidden="true"><i /><span /></div>
+        <div className="water-ripples" aria-hidden="true"><i /><i /><i /></div>
+        <div className="plate-surface">
+          <div className="clean-plate" aria-hidden="true"><span>✦</span></div>
+          <div className="foam-layer" aria-hidden="true" style={{ opacity: Math.min(progress / 80, .82) }}>
+            {Array.from({ length: 14 }, (_, index) => <i key={index} />)}
+          </div>
+          <canvas
+            ref={canvasRef}
+            className="plate-dirt"
+            aria-label="脏盘子清洁区域"
+            onPointerEnter={wipe}
+            onPointerLeave={() => setSponge((current) => ({ ...current, visible: false, active: false }))}
+            onPointerDown={(event) => {
+              drawingRef.current = true
+              event.currentTarget.setPointerCapture(event.pointerId)
+              wipe(event)
+            }}
+            onPointerMove={wipe}
+            onPointerUp={() => {
+              drawingRef.current = false
+              setSponge((current) => ({ ...current, active: false }))
+              const canvas = canvasRef.current
+              const context = canvas?.getContext('2d', { willReadFrequently: true })
+              if (canvas && context && !completedRef.current) measure(context, canvas)
+            }}
+            onPointerCancel={() => {
+              drawingRef.current = false
+              setSponge((current) => ({ ...current, active: false }))
+            }}
+          />
+          {sponge.visible && (
+            <div
+              className={`sponge-tool ${sponge.active ? 'active' : ''}`}
+              aria-hidden="true"
+              style={{ left: `${(sponge.x / canvasWidth) * 100}%`, top: `${(sponge.y / canvasHeight) * 100}%` }}
+            ><span /></div>
+          )}
+          <div className="wash-instruction" aria-hidden="true">按住并来回擦洗</div>
+        </div>
       </div>
-      <div className="plate-progress"><span style={{ width: `${progress}%` }} /></div>
-      <small>{progress >= completionThreshold ? '清洁完成，正在结算…' : `清洁度 ${progress}% · 达到 ${completionThreshold}% 完成`}</small>
-    </div>
+
+      <div className="wash-footer" aria-live="polite">
+        <div className="plate-progress"><span style={{ width: `${progress}%` }} /></div>
+        <strong>{progress}%</strong>
+        <span>{progress >= completionThreshold ? '洗干净了，正在结算奖励…' : progress > 0 ? '继续擦，还有残渣' : '从盘面任意位置开始擦洗'}</span>
+      </div>
+    </section>
   )
 }
