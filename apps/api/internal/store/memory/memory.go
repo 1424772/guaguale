@@ -30,6 +30,8 @@ type Store struct {
 	robotQueues       map[uint64][]robotJob
 	robotLastTicks    map[uint64]time.Time
 	fanEvents         map[string]domain.FanEvent
+	balanceRankedAt   map[uint64]time.Time
+	robotProcessed    map[string]bool
 }
 
 type robotJob struct {
@@ -58,6 +60,8 @@ func New() *Store {
 		robotQueues:       make(map[uint64][]robotJob),
 		robotLastTicks:    make(map[uint64]time.Time),
 		fanEvents:         make(map[string]domain.FanEvent),
+		balanceRankedAt:   make(map[uint64]time.Time),
+		robotProcessed:    make(map[string]bool),
 	}
 }
 
@@ -79,6 +83,7 @@ func (store *Store) CreateUser(_ context.Context, username, passwordHash string,
 	}
 	store.nextUserID++
 	store.users[user.ID] = userRecord{user: user, passwordHash: passwordHash}
+	store.balanceRankedAt[user.ID] = user.CreatedAt
 	store.usernames[username] = user.ID
 	return user, nil
 }
@@ -136,6 +141,7 @@ func (store *Store) UpgradeItem(_ context.Context, input basestore.UpgradeItemIn
 		return domain.User{}, domain.ItemUpgrade{}, false, basestore.ErrInsufficientFunds
 	}
 	record.user.Balance -= input.Price
+	store.balanceRankedAt[input.UserID] = time.Now().UTC()
 	if input.ItemCode == "luck" {
 		record.user.LuckLevel = input.ToLevel
 	} else if input.ItemCode == "scratch-range" {
@@ -225,6 +231,7 @@ func (store *Store) PurchaseTicket(_ context.Context, input basestore.CreateTick
 		return domain.User{}, domain.Ticket{}, false, basestore.ErrInsufficientFunds
 	}
 	record.user.Balance -= input.Price
+	store.balanceRankedAt[input.UserID] = time.Now().UTC()
 	store.users[input.UserID] = record
 	now := time.Now().UTC()
 	ticket := domain.Ticket{
@@ -273,6 +280,7 @@ func (store *Store) ClaimDailyLogin(_ context.Context, userID uint64, date strin
 		return record.user, cloneDaily(daily), true, nil
 	}
 	record.user.Balance += amount
+	store.balanceRankedAt[userID] = time.Now().UTC()
 	store.users[userID] = record
 	daily.LoginClaimed = true
 	store.daily[dailyKey(userID, date)] = daily
@@ -322,6 +330,7 @@ func (store *Store) CompletePlate(_ context.Context, userID uint64, date, action
 		return domain.User{}, domain.DailyStatus{}, false, basestore.ErrDailyLimit
 	}
 	record.user.Balance += amount
+	store.balanceRankedAt[userID] = completedAt.UTC()
 	store.users[userID] = record
 	plate.action.State = "completed"
 	plate.action.CompletedAt = &completedAt
@@ -413,6 +422,7 @@ func (store *Store) ScratchTicket(_ context.Context, userID uint64, ticketID str
 		}
 		now := time.Now().UTC()
 		ticket.State = domain.TicketScratched
+		ticket.ScratchSource = "manual"
 		ticket.ScratchedAt = &now
 		store.tickets[ticketID] = ticket
 	}
@@ -440,6 +450,7 @@ func (store *Store) RedeemTicket(_ context.Context, userID uint64, ticketID stri
 		return domain.User{}, domain.Ticket{}, false, basestore.ErrNotWinner
 	}
 	record.user.Balance += ticket.Reward
+	store.balanceRankedAt[userID] = time.Now().UTC()
 	store.users[userID] = record
 	now := time.Now().UTC()
 	ticket.State = domain.TicketRedeemed

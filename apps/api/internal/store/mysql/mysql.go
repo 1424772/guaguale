@@ -145,7 +145,7 @@ func (store *Store) PurchaseTicket(ctx context.Context, input basestore.CreateTi
 	}
 	before := user.Balance
 	user.Balance -= input.Price
-	if _, err := tx.ExecContext(ctx, `UPDATE users SET balance = ? WHERE id = ?`, user.Balance, user.ID); err != nil {
+	if _, err := tx.ExecContext(ctx, `UPDATE users SET balance = ?, balance_ranked_at = UTC_TIMESTAMP(6) WHERE id = ?`, user.Balance, user.ID); err != nil {
 		return domain.User{}, domain.Ticket{}, false, err
 	}
 	_, err = tx.ExecContext(ctx, `
@@ -198,7 +198,7 @@ func (store *Store) ListTickets(ctx context.Context, userID uint64) ([]domain.Ti
 		SELECT id, user_id, card_code, card_name, source, purchase_key, price, price_paid,
 			COALESCE(DATE_FORMAT(wheel_date, '%Y-%m-%d'), ''), luck_level,
 			prize_tier, reward, symbols, state, location, desk_x, desk_y, rotation, z_index, slot_index,
-			created_at, scratched_at, redeemed_at, discarded_at
+			created_at, COALESCE(scratch_source, ''), scratched_at, redeemed_at, discarded_at
 		FROM tickets
 		WHERE user_id = ? AND state IN ('purchased', 'scratched')
 		ORDER BY created_at DESC
@@ -234,7 +234,7 @@ func (store *Store) ScratchTicket(ctx context.Context, userID uint64, ticketID s
 		}
 		now := time.Now().UTC()
 		if _, err := tx.ExecContext(ctx,
-			`UPDATE tickets SET state = 'scratched', scratched_at = ? WHERE id = ?`, now, ticket.ID,
+			`UPDATE tickets SET state = 'scratched', scratch_source = 'manual', scratched_at = ? WHERE id = ?`, now, ticket.ID,
 		); err != nil {
 			return domain.Ticket{}, err
 		}
@@ -279,7 +279,7 @@ func (store *Store) RedeemTicket(ctx context.Context, userID uint64, ticketID st
 
 	before := user.Balance
 	user.Balance += ticket.Reward
-	if _, err := tx.ExecContext(ctx, `UPDATE users SET balance = ? WHERE id = ?`, user.Balance, user.ID); err != nil {
+	if _, err := tx.ExecContext(ctx, `UPDATE users SET balance = ?, balance_ranked_at = UTC_TIMESTAMP(6) WHERE id = ?`, user.Balance, user.ID); err != nil {
 		return domain.User{}, domain.Ticket{}, false, err
 	}
 	now := time.Now().UTC()
@@ -348,7 +348,7 @@ func (store *Store) ClaimDailyLogin(ctx context.Context, userID uint64, date str
 	}
 	before := user.Balance
 	user.Balance += amount
-	if _, err := tx.ExecContext(ctx, `UPDATE users SET balance = ? WHERE id = ?`, user.Balance, userID); err != nil {
+	if _, err := tx.ExecContext(ctx, `UPDATE users SET balance = ?, balance_ranked_at = UTC_TIMESTAMP(6) WHERE id = ?`, user.Balance, userID); err != nil {
 		return domain.User{}, domain.DailyStatus{}, false, err
 	}
 	if _, err := tx.ExecContext(ctx, `UPDATE daily_user_state SET login_claimed = 1 WHERE user_id = ? AND local_date = ?`, userID, date); err != nil {
@@ -451,7 +451,7 @@ func (store *Store) CompletePlate(ctx context.Context, userID uint64, date, acti
 	}
 	before := user.Balance
 	user.Balance += amount
-	if _, err := tx.ExecContext(ctx, `UPDATE users SET balance = ? WHERE id = ?`, user.Balance, userID); err != nil {
+	if _, err := tx.ExecContext(ctx, `UPDATE users SET balance = ?, balance_ranked_at = UTC_TIMESTAMP(6) WHERE id = ?`, user.Balance, userID); err != nil {
 		return domain.User{}, domain.DailyStatus{}, false, err
 	}
 	if _, err := tx.ExecContext(ctx, `
@@ -594,43 +594,43 @@ func (store *Store) UpgradeItem(ctx context.Context, input basestore.UpgradeItem
 		return domain.User{}, domain.ItemUpgrade{}, false, err
 	}
 	currentLevel := user.LuckLevel
-	updateQuery := `UPDATE users SET balance = ?, luck_level = ? WHERE id = ?`
+	updateQuery := `UPDATE users SET balance = ?, luck_level = ?, balance_ranked_at = UTC_TIMESTAMP(6) WHERE id = ?`
 	if input.ItemCode == "scratch-range" {
 		currentLevel = user.ScratchLevel
-		updateQuery = `UPDATE users SET balance = ?, scratch_level = ? WHERE id = ?`
+		updateQuery = `UPDATE users SET balance = ?, scratch_level = ?, balance_ranked_at = UTC_TIMESTAMP(6) WHERE id = ?`
 	} else if input.ItemCode == "trash" {
 		currentLevel = boolLevel(user.TrashOwned)
-		updateQuery = `UPDATE users SET balance = ?, trash_owned = ? WHERE id = ?`
+		updateQuery = `UPDATE users SET balance = ?, trash_owned = ?, balance_ranked_at = UTC_TIMESTAMP(6) WHERE id = ?`
 	} else if input.ItemCode == "card-slots" {
 		currentLevel = boolLevel(user.CardSlotsOwned)
-		updateQuery = `UPDATE users SET balance = ?, card_slots_owned = ? WHERE id = ?`
+		updateQuery = `UPDATE users SET balance = ?, card_slots_owned = ?, balance_ranked_at = UTC_TIMESTAMP(6) WHERE id = ?`
 	} else if input.ItemCode == "fan" {
 		if !user.TrashOwned {
 			return domain.User{}, domain.ItemUpgrade{}, false, basestore.ErrTrashRequired
 		}
 		currentLevel = user.FanLevel
-		updateQuery = `UPDATE users SET balance = ?, fan_level = ? WHERE id = ?`
+		updateQuery = `UPDATE users SET balance = ?, fan_level = ?, balance_ranked_at = UTC_TIMESTAMP(6) WHERE id = ?`
 	} else if input.ItemCode == "robot" {
 		currentLevel = boolLevel(user.RobotOwned)
-		updateQuery = `UPDATE users SET balance = ?, robot_owned = ?, robot_speed_level = 1, robot_queue_level = 1, robot_intercept_level = 1 WHERE id = ?`
+		updateQuery = `UPDATE users SET balance = ?, robot_owned = ?, robot_speed_level = 1, robot_queue_level = 1, robot_intercept_level = 1, balance_ranked_at = UTC_TIMESTAMP(6) WHERE id = ?`
 	} else if input.ItemCode == "robot-speed" {
 		if !user.RobotOwned {
 			return domain.User{}, domain.ItemUpgrade{}, false, basestore.ErrRobotRequired
 		}
 		currentLevel = user.RobotSpeedLevel
-		updateQuery = `UPDATE users SET balance = ?, robot_speed_level = ? WHERE id = ?`
+		updateQuery = `UPDATE users SET balance = ?, robot_speed_level = ?, balance_ranked_at = UTC_TIMESTAMP(6) WHERE id = ?`
 	} else if input.ItemCode == "robot-queue" {
 		if !user.RobotOwned {
 			return domain.User{}, domain.ItemUpgrade{}, false, basestore.ErrRobotRequired
 		}
 		currentLevel = user.RobotQueueLevel
-		updateQuery = `UPDATE users SET balance = ?, robot_queue_level = ? WHERE id = ?`
+		updateQuery = `UPDATE users SET balance = ?, robot_queue_level = ?, balance_ranked_at = UTC_TIMESTAMP(6) WHERE id = ?`
 	} else if input.ItemCode == "robot-intercept" {
 		if !user.RobotOwned {
 			return domain.User{}, domain.ItemUpgrade{}, false, basestore.ErrRobotRequired
 		}
 		currentLevel = user.RobotInterceptLevel
-		updateQuery = `UPDATE users SET balance = ?, robot_intercept_level = ? WHERE id = ?`
+		updateQuery = `UPDATE users SET balance = ?, robot_intercept_level = ?, balance_ranked_at = UTC_TIMESTAMP(6) WHERE id = ?`
 	} else if input.ItemCode != "luck" {
 		return domain.User{}, domain.ItemUpgrade{}, false, basestore.ErrInvalidState
 	}
@@ -807,7 +807,7 @@ func scanTicket(row scanner) (domain.Ticket, error) {
 		&ticket.ID, &ticket.UserID, &ticket.CardCode, &ticket.CardName, &ticket.Source, &ticket.PurchaseKey,
 		&ticket.Price, &ticket.PricePaid, &ticket.WheelDate, &ticket.LuckLevel, &ticket.PrizeTier, &ticket.Reward, &symbolsJSON,
 		&state, &location, &ticket.DeskX, &ticket.DeskY, &ticket.Rotation, &ticket.ZIndex, &slotIndex,
-		&ticket.CreatedAt, &ticket.ScratchedAt, &ticket.RedeemedAt, &ticket.DiscardedAt,
+		&ticket.CreatedAt, &ticket.ScratchSource, &ticket.ScratchedAt, &ticket.RedeemedAt, &ticket.DiscardedAt,
 	)
 	if err != nil {
 		return domain.Ticket{}, err
@@ -866,7 +866,7 @@ func ticketByPurchaseKey(ctx context.Context, tx *sql.Tx, userID uint64, key str
 		SELECT id, user_id, card_code, card_name, source, purchase_key, price, price_paid,
 			COALESCE(DATE_FORMAT(wheel_date, '%Y-%m-%d'), ''), luck_level,
 			prize_tier, reward, symbols, state, location, desk_x, desk_y, rotation, z_index, slot_index,
-			created_at, scratched_at, redeemed_at, discarded_at
+			created_at, COALESCE(scratch_source, ''), scratched_at, redeemed_at, discarded_at
 		FROM tickets WHERE user_id = ? AND purchase_key = ?`, userID, key))
 	if errors.Is(err, sql.ErrNoRows) {
 		return domain.Ticket{}, basestore.ErrNotFound
@@ -879,7 +879,7 @@ func lockedTicket(ctx context.Context, tx *sql.Tx, userID uint64, ticketID strin
 		SELECT id, user_id, card_code, card_name, source, purchase_key, price, price_paid,
 			COALESCE(DATE_FORMAT(wheel_date, '%Y-%m-%d'), ''), luck_level,
 			prize_tier, reward, symbols, state, location, desk_x, desk_y, rotation, z_index, slot_index,
-			created_at, scratched_at, redeemed_at, discarded_at
+			created_at, COALESCE(scratch_source, ''), scratched_at, redeemed_at, discarded_at
 		FROM tickets WHERE id = ? AND user_id = ? FOR UPDATE`, ticketID, userID))
 	if errors.Is(err, sql.ErrNoRows) {
 		return domain.Ticket{}, basestore.ErrNotFound

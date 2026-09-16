@@ -162,10 +162,10 @@ func (store *Store) TickRobot(ctx context.Context, userID uint64, now time.Time,
 	if ticket.Reward > 0 {
 		before := user.Balance
 		user.Balance += ticket.Reward
-		if _, err := tx.ExecContext(ctx, `UPDATE users SET balance = ? WHERE id = ?`, user.Balance, user.ID); err != nil {
+		if _, err := tx.ExecContext(ctx, `UPDATE users SET balance = ?, balance_ranked_at = UTC_TIMESTAMP(6) WHERE id = ?`, user.Balance, user.ID); err != nil {
 			return domain.User{}, nil, nil, err
 		}
-		if _, err := tx.ExecContext(ctx, `UPDATE tickets SET state = 'redeemed', scratched_at = ?, redeemed_at = ? WHERE id = ?`, now, now, ticket.ID); err != nil {
+		if _, err := tx.ExecContext(ctx, `UPDATE tickets SET state = 'redeemed', scratch_source = 'robot', scratched_at = ?, redeemed_at = ? WHERE id = ?`, now, now, ticket.ID); err != nil {
 			return domain.User{}, nil, nil, err
 		}
 		if _, err := tx.ExecContext(ctx, `
@@ -182,7 +182,7 @@ func (store *Store) TickRobot(ctx context.Context, userID uint64, now time.Time,
 	} else {
 		if _, err := tx.ExecContext(ctx, `
 			UPDATE tickets SET state = 'scratched', location = 'desk', desk_x = 0.780000, desk_y = 0.720000,
-				rotation = 3, z_index = z_index + 1, scratched_at = ? WHERE id = ?`, now, ticket.ID,
+				rotation = 3, z_index = z_index + 1, scratch_source = 'robot', scratched_at = ? WHERE id = ?`, now, ticket.ID,
 		); err != nil {
 			return domain.User{}, nil, nil, err
 		}

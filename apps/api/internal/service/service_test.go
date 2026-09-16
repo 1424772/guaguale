@@ -163,6 +163,57 @@ func TestRegistrationValidation(t *testing.T) {
 	}
 }
 
+func TestLeaderboardAndGameHistory(t *testing.T) {
+	ctx := context.Background()
+	service := New(memory.New())
+	first, err := service.Register(ctx, "排行甲玩家", "correct-horse-42", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := service.Register(ctx, "排行乙玩家", "correct-horse-42", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	third, err := service.Register(ctx, "排行丙玩家", "correct-horse-42", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	service.drawCard = func(string, uint8) (domain.Outcome, error) {
+		return domain.Outcome{PrizeTier: "first", Reward: 100, Symbols: []string{"碎钻石", "钞票", "碎钻石"}}, nil
+	}
+	purchase, err := service.Purchase(ctx, first.User, "lingqian-ticket", "ranking-history-card")
+	if err != nil {
+		t.Fatal(err)
+	}
+	leaderboard, err := service.Leaderboard(ctx, purchase.User)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if leaderboard.TotalUsers != 3 || leaderboard.CurrentUser.Rank != 3 || leaderboard.CurrentUser.Username != "排***家" {
+		t.Fatalf("unexpected leaderboard: %#v", leaderboard)
+	}
+	if leaderboard.Entries[0].UserID != second.User.ID || leaderboard.Entries[1].UserID != third.User.ID {
+		t.Fatalf("tie-break order is unstable: %#v", leaderboard.Entries)
+	}
+
+	if _, err := service.Scratch(ctx, first.User.ID, purchase.Ticket.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.Redeem(ctx, first.User.ID, purchase.Ticket.ID); err != nil {
+		t.Fatal(err)
+	}
+	events, err := service.GameHistory(ctx, first.User.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(events) != 3 || events[0].Type != "redeem" || events[1].Type != "scratch" || events[2].Type != "purchase" {
+		t.Fatalf("unexpected lifecycle history: %#v", events)
+	}
+	if events[0].Delta != 100 || events[2].Delta != -50 {
+		t.Fatalf("unexpected history deltas: %#v", events)
+	}
+}
+
 func TestDeskPlacementSlotsAndDiscard(t *testing.T) {
 	ctx := context.Background()
 	service := New(memory.New())

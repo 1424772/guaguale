@@ -41,7 +41,7 @@ func (store *Store) BlowFan(ctx context.Context, input basestore.BlowFanInput) (
 		SELECT id, user_id, card_code, card_name, source, purchase_key, price, price_paid,
 			COALESCE(DATE_FORMAT(wheel_date, '%Y-%m-%d'), ''), luck_level,
 			prize_tier, reward, symbols, state, location, desk_x, desk_y, rotation, z_index, slot_index,
-			created_at, scratched_at, redeemed_at, discarded_at
+			created_at, COALESCE(scratch_source, ''), scratched_at, redeemed_at, discarded_at
 		FROM tickets
 		WHERE user_id = ? AND location = 'desk' AND state IN ('purchased', 'scratched')
 		ORDER BY z_index, id FOR UPDATE`, input.UserID)

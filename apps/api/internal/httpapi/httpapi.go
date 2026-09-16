@@ -67,6 +67,8 @@ func New(service *service.Service, store store.Store, logger *slog.Logger, cooki
 	mux.Handle("POST /api/v1/auth/logout", api.requireUser(http.HandlerFunc(api.logout)))
 	mux.Handle("GET /api/v1/me", api.requireUser(http.HandlerFunc(api.me)))
 	mux.Handle("GET /api/v1/cards", api.requireUser(http.HandlerFunc(api.cards)))
+	mux.Handle("GET /api/v1/leaderboard", api.requireUser(http.HandlerFunc(api.leaderboard)))
+	mux.Handle("GET /api/v1/history", api.requireUser(http.HandlerFunc(api.gameHistory)))
 	mux.Handle("POST /api/v1/cards/{code}/purchase", api.requireUser(http.HandlerFunc(api.purchase)))
 	mux.Handle("GET /api/v1/shop", api.requireUser(http.HandlerFunc(api.shop)))
 	mux.Handle("POST /api/v1/shop/{code}/upgrade", api.requireUser(http.HandlerFunc(api.upgradeItem)))
@@ -161,6 +163,24 @@ func (api *API) me(response http.ResponseWriter, request *http.Request) {
 func (api *API) cards(response http.ResponseWriter, request *http.Request) {
 	user := currentUser(request)
 	writeJSON(response, http.StatusOK, map[string]any{"cards": api.service.Cards(user.Balance)})
+}
+
+func (api *API) leaderboard(response http.ResponseWriter, request *http.Request) {
+	leaderboard, err := api.service.Leaderboard(request.Context(), currentUser(request))
+	if err != nil {
+		api.writeError(response, request, err)
+		return
+	}
+	writeJSON(response, http.StatusOK, map[string]any{"leaderboard": leaderboard})
+}
+
+func (api *API) gameHistory(response http.ResponseWriter, request *http.Request) {
+	events, err := api.service.GameHistory(request.Context(), currentUser(request).ID)
+	if err != nil {
+		api.writeError(response, request, err)
+		return
+	}
+	writeJSON(response, http.StatusOK, map[string]any{"events": events})
 }
 
 func (api *API) purchase(response http.ResponseWriter, request *http.Request) {

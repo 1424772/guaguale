@@ -1,6 +1,8 @@
 import { FormEvent, KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerEvent, useEffect, useMemo, useRef, useState } from 'react'
-import { ApiError, api, type Card, type DailyStatus, type FanCardEvent, type FanStatus, type RobotStatus, type ShopItem, type ShopStatus, type Ticket, type User } from './api'
+import { ApiError, api, type Card, type DailyStatus, type FanCardEvent, type FanStatus, type HistoryEvent, type Leaderboard, type RobotStatus, type ShopItem, type ShopStatus, type Ticket, type User } from './api'
 import { DeskTicket, type DeskPlacement } from './DeskTicket'
+import { HistoryDialog } from './HistoryDialog'
+import { LeaderboardDialog } from './LeaderboardDialog'
 import { PlateCleaning } from './PlateCleaning'
 import { getSymbolVisual, ScratchCard, symbolClassName } from './ScratchCard'
 import { ShopDialog } from './ShopDialog'
@@ -36,6 +38,14 @@ export function App() {
   const [fanHolding, setFanHolding] = useState(false)
   const [fanBusy, setFanBusy] = useState(false)
   const [fanActions, setFanActions] = useState<Record<string, FanCardEvent['action']>>({})
+  const [leaderboardOpen, setLeaderboardOpen] = useState(false)
+  const [leaderboard, setLeaderboard] = useState<Leaderboard | null>(null)
+  const [leaderboardLoading, setLeaderboardLoading] = useState(false)
+  const [leaderboardError, setLeaderboardError] = useState('')
+  const [historyOpen, setHistoryOpen] = useState(false)
+  const [historyEvents, setHistoryEvents] = useState<HistoryEvent[]>([])
+  const [historyLoading, setHistoryLoading] = useState(false)
+  const [historyError, setHistoryError] = useState('')
   const [dailyBusy, setDailyBusy] = useState(false)
   const [wheelSpinning, setWheelSpinning] = useState(false)
   const [pendingDiscard, setPendingDiscard] = useState<Ticket | null>(null)
@@ -239,6 +249,34 @@ export function App() {
       setNotice(messageFrom(error))
     } finally {
       setBusy(false)
+    }
+  }
+
+  async function openLeaderboard() {
+    setLeaderboardOpen(true)
+    setLeaderboardLoading(true)
+    setLeaderboardError('')
+    try {
+      const response = await api.leaderboard()
+      setLeaderboard(response.leaderboard)
+    } catch (error) {
+      setLeaderboardError(messageFrom(error))
+    } finally {
+      setLeaderboardLoading(false)
+    }
+  }
+
+  async function openHistory() {
+    setHistoryOpen(true)
+    setHistoryLoading(true)
+    setHistoryError('')
+    try {
+      const response = await api.history()
+      setHistoryEvents(response.events)
+    } catch (error) {
+      setHistoryError(messageFrom(error))
+    } finally {
+      setHistoryLoading(false)
     }
   }
 
@@ -600,7 +638,8 @@ export function App() {
         <nav aria-label="主要功能">
           <button type="button" onClick={() => setDailyOpen(true)}>今日任务</button>
           <button type="button" onClick={() => void openShop('luck')} disabled={busy}>商店</button>
-          <button type="button">排行榜</button>
+          <button type="button" onClick={() => void openLeaderboard()}>排行榜</button>
+          <button type="button" onClick={() => void openHistory()}>记录</button>
           <button type="button" onClick={handleLogout} disabled={busy}>退出</button>
         </nav>
       </header>
@@ -808,6 +847,14 @@ export function App() {
             <div><button type="button" className="secondary-button" onClick={() => setFanRiskOpen(false)}>暂不使用</button><button type="button" className="gold-button" onClick={() => { setFanRiskPending(true); setFanRiskOpen(false); setNotice('风险已确认，请持续按住风扇启动') }}>我已了解</button></div>
           </section>
         </div>
+      )}
+
+      {leaderboardOpen && (
+        <LeaderboardDialog leaderboard={leaderboard} loading={leaderboardLoading} error={leaderboardError} onClose={() => setLeaderboardOpen(false)} onRefresh={() => void openLeaderboard()} />
+      )}
+
+      {historyOpen && (
+        <HistoryDialog events={historyEvents} loading={historyLoading} error={historyError} onClose={() => setHistoryOpen(false)} onRefresh={() => void openHistory()} />
       )}
     </main>
   )

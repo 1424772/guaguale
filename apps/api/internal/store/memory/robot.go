@@ -89,10 +89,12 @@ func (store *Store) TickRobot(_ context.Context, userID uint64, now time.Time, d
 		return domain.User{}, nil, nil, basestore.ErrInvalidState
 	}
 	ticket.State = domain.TicketScratched
+	ticket.ScratchSource = "robot"
 	ticket.ScratchedAt = &now
 	event := &domain.RobotEvent{}
 	if ticket.Reward > 0 {
 		record.user.Balance += ticket.Reward
+		store.balanceRankedAt[userID] = now.UTC()
 		ticket.State = domain.TicketRedeemed
 		ticket.RedeemedAt = &now
 		event.AutoRedeemed = true
@@ -105,6 +107,7 @@ func (store *Store) TickRobot(_ context.Context, userID uint64, now time.Time, d
 	}
 	store.users[userID] = record
 	store.tickets[ticket.ID] = ticket
+	store.robotProcessed[ticket.ID] = true
 	store.robotQueues[userID] = append([]robotJob(nil), queue[1:]...)
 	event.Ticket = revealTicket(ticket)
 	return record.user, event, store.robotQueueLocked(userID), nil

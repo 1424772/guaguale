@@ -162,6 +162,33 @@ export type FanEvent = {
   idempotent: boolean
 }
 
+export type RankedUser = {
+  rank: number
+  username: string
+  balance: number
+  isCurrent: boolean
+}
+
+export type Leaderboard = {
+  entries: RankedUser[]
+  currentUser: RankedUser
+  totalUsers: number
+  generatedAt: string
+  cached: boolean
+}
+
+export type HistoryEvent = {
+  id: string
+  type: 'purchase' | 'scratch' | 'redeem' | 'discard' | 'robot'
+  title: string
+  detail: string
+  cardCode?: string
+  cardName?: string
+  delta?: number
+  automated?: boolean
+  createdAt: string
+}
+
 type ApiErrorBody = {
   error?: {
     code?: string
@@ -223,6 +250,8 @@ export const api = {
   }),
   logout: () => request<void>('/api/v1/auth/logout', { method: 'POST' }),
   cards: () => request<{ cards: Card[] }>('/api/v1/cards'),
+  leaderboard: () => request<{ leaderboard: Leaderboard }>('/api/v1/leaderboard'),
+  history: () => request<{ events: HistoryEvent[] }>('/api/v1/history'),
   shop: () => request<{ shop: ShopStatus }>('/api/v1/shop'),
   upgradeItem: (itemCode: string, idempotencyKey: string) => request<{
     user: User

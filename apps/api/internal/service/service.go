@@ -36,10 +36,11 @@ var (
 )
 
 type Service struct {
-	store    store.Store
-	now      func() time.Time
-	drawCard func(string, uint8) (domain.Outcome, error)
-	fanRoll  store.FanRollFunc
+	store            store.Store
+	now              func() time.Time
+	drawCard         func(string, uint8) (domain.Outcome, error)
+	fanRoll          store.FanRollFunc
+	leaderboardCache LeaderboardCache
 }
 
 type AuthResult struct {
@@ -101,6 +102,12 @@ type FanResult struct {
 
 func New(store store.Store) *Service {
 	return &Service{store: store, now: time.Now, drawCard: game.Draw, fanRoll: secureRoll}
+}
+
+func NewWithLeaderboardCache(store store.Store, cache LeaderboardCache) *Service {
+	service := New(store)
+	service.leaderboardCache = cache
+	return service
 }
 
 func (service *Service) Register(ctx context.Context, username, password string, ageConfirmed bool) (AuthResult, error) {

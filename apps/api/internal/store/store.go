@@ -117,4 +117,7 @@ type Store interface {
 	CompletePlate(context.Context, uint64, string, string, time.Time, int64) (domain.User, domain.DailyStatus, bool, error)
 	SpinDailyWheel(context.Context, uint64, string, string, WheelDrawFunc) (domain.User, domain.Ticket, domain.DailyStatus, bool, error)
 	DeleteExpiredSessions(context.Context, time.Time) error
+	TopPlayers(context.Context, int) ([]domain.RankedUser, error)
+	PlayerRank(context.Context, uint64) (domain.RankedUser, int, error)
+	GameHistory(context.Context, uint64, int) ([]domain.HistoryEvent, error)
 }

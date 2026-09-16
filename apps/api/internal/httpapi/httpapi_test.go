@@ -75,6 +75,26 @@ func TestRegisterRequiresAgeConfirmationAndPurchaseIsIdempotent(t *testing.T) {
 	if retry.Code != http.StatusCreated || second.User.Balance != 950 || second.Ticket.ID != first.Ticket.ID || !second.Idempotent {
 		t.Fatalf("purchase retry was not idempotent: %#v", second)
 	}
+
+	leaderboard := getJSON(t, handler, "/api/v1/leaderboard", cookies[0])
+	if leaderboard.Code != http.StatusOK || bytes.Contains(leaderboard.Body.Bytes(), []byte("接口玩家")) || bytes.Contains(leaderboard.Body.Bytes(), []byte("userId")) {
+		t.Fatalf("leaderboard leaked private identity: %d %s", leaderboard.Code, leaderboard.Body.String())
+	}
+	history := getJSON(t, handler, "/api/v1/history", cookies[0])
+	if history.Code != http.StatusOK || !bytes.Contains(history.Body.Bytes(), []byte("购买刮刮卡")) {
+		t.Fatalf("history endpoint did not return purchase event: %d %s", history.Code, history.Body.String())
+	}
+}
+
+func getJSON(t *testing.T, handler http.Handler, path string, cookie *http.Cookie) *httptest.ResponseRecorder {
+	t.Helper()
+	request := httptest.NewRequest(http.MethodGet, path, nil)
+	if cookie != nil {
+		request.AddCookie(cookie)
+	}
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	return response
 }
 
 func postJSON(t *testing.T, handler http.Handler, path string, body any, cookie *http.Cookie, idempotencyKey string) *httptest.ResponseRecorder {

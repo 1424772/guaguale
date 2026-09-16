@@ -13,6 +13,7 @@ import (
 	"syscall"
 	"time"
 
+	rediscache "github.com/1424772/guaguale/apps/api/internal/cache/redis"
 	"github.com/1424772/guaguale/apps/api/internal/httpapi"
 	"github.com/1424772/guaguale/apps/api/internal/service"
 	"github.com/1424772/guaguale/apps/api/internal/store"
@@ -40,7 +41,9 @@ func main() {
 	}
 	defer closeStore()
 
-	serviceLayer := service.New(applicationStore)
+	leaderboardCache, closeCache := initializeLeaderboardCache(logger)
+	defer closeCache()
+	serviceLayer := service.NewWithLeaderboardCache(applicationStore, leaderboardCache)
 	handler := httpapi.New(serviceLayer, applicationStore, logger, envBool("COOKIE_SECURE", false))
 	server := &http.Server{
 		Addr:              ":" + envString("API_PORT", defaultPort),
@@ -71,6 +74,23 @@ func main() {
 		logger.Error("graceful shutdown failed", "error", err)
 		os.Exit(1)
 	}
+}
+
+func initializeLeaderboardCache(logger *slog.Logger) (service.LeaderboardCache, func()) {
+	address := os.Getenv("REDIS_ADDR")
+	if address == "" {
+		return nil, func() {}
+	}
+	cache := rediscache.New(address, os.Getenv("REDIS_PASSWORD"))
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	if err := cache.Ping(ctx); err != nil {
+		logger.Warn("redis leaderboard cache unavailable; falling back to mysql", "error", err)
+		_ = cache.Close()
+		return nil, func() {}
+	}
+	logger.Info("redis leaderboard cache enabled", "address", address)
+	return cache, func() { _ = cache.Close() }
 }
 
 func initializeStore(logger *slog.Logger) (store.Store, func(), error) {
