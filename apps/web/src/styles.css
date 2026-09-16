@@ -1161,6 +1161,218 @@ button { color: inherit; }
   .empty-free-desk { left: 25%; right: 10%; top: 33%; bottom: 42%; }
 }
 
+/* Item shop v2: a compact brass-and-leather catalog with consistent actions. */
+.shop-backdrop {
+  padding: 34px;
+  background: rgba(5, 8, 6, .76);
+  backdrop-filter: blur(9px) saturate(.72);
+}
+
+.shop-dialog {
+  position: relative;
+  width: min(1180px, 94vw);
+  max-height: min(880px, 92vh);
+  overflow: auto;
+  border: 4px double #9d773c;
+  border-radius: 20px;
+  color: #f1e4bd;
+  background:
+    linear-gradient(145deg, rgba(17, 49, 39, .99), rgba(5, 24, 19, .995) 70%),
+    repeating-linear-gradient(98deg, transparent 0 15px, rgba(255,255,255,.018) 16px 17px);
+  box-shadow: 0 38px 100px rgba(0,0,0,.78), inset 0 0 0 1px rgba(250,213,127,.18), inset 0 0 58px rgba(0,0,0,.28);
+}
+
+.shop-dialog::before {
+  content: "";
+  position: absolute;
+  z-index: 6;
+  inset: 8px;
+  border: 1px solid rgba(221,180,91,.24);
+  border-radius: 13px;
+  pointer-events: none;
+}
+
+.shop-header {
+  min-height: 96px;
+  padding: 22px 92px 18px 32px;
+  border-bottom: 1px solid rgba(221,178,81,.32);
+  background: linear-gradient(90deg, rgba(10,38,30,.96), rgba(22,61,48,.9) 50%, rgba(8,31,25,.96));
+  box-shadow: inset 0 -12px 24px rgba(0,0,0,.16);
+}
+.shop-header .eyebrow { color: #d7ad52; letter-spacing: .2em; }
+.shop-header h1 { color: #fff0c2; font-size: 34px; text-shadow: 0 3px 7px #000; }
+.shop-balance { min-width: 260px; padding: 9px 16px; border: 1px solid rgba(205,164,77,.22); border-radius: 9px; background: rgba(0,0,0,.16); }
+.shop-balance strong { color: #ffd76d; font-size: 20px; }
+
+.shop-tabs {
+  top: 0;
+  gap: 0;
+  padding: 12px 32px;
+  border-bottom: 1px solid rgba(204,164,77,.2);
+  background: rgba(5,26,21,.97);
+}
+.shop-tabs button {
+  min-width: 126px;
+  min-height: 44px;
+  border: 1px solid #5d573b;
+  border-right-width: 0;
+  border-radius: 0;
+  color: #b8b39c;
+  background: linear-gradient(#14372d, #0a281f);
+}
+.shop-tabs button:first-child { border-radius: 8px 0 0 8px; }
+.shop-tabs button:last-child { border-right-width: 1px; border-radius: 0 8px 8px 0; }
+.shop-tabs button.active { color: #2a1a08; border-color: #bd8c3b; background: linear-gradient(#f1cf7a, #a97329); box-shadow: inset 0 1px #fff2bb; }
+
+.shop-layout {
+  grid-template-columns: minmax(0, 1.08fr) minmax(390px, .92fr);
+  gap: 22px;
+  padding: 18px 32px 32px;
+}
+.shop-items { gap: 12px; }
+.shop-item {
+  position: relative;
+  min-height: 154px;
+  grid-template-columns: 82px 1fr;
+  grid-template-rows: 1fr auto;
+  align-content: stretch;
+  gap: 9px 14px;
+  padding: 17px;
+  overflow: hidden;
+  border: 1px solid #405f50;
+  border-radius: 12px;
+  background: linear-gradient(145deg, rgba(14,45,35,.94), rgba(4,24,19,.98));
+  box-shadow: inset 0 1px rgba(255,255,255,.035), 0 8px 16px rgba(0,0,0,.12);
+}
+.shop-item:hover, .shop-item.selected { border-color: #c29a4b; background: linear-gradient(145deg, rgba(37,78,61,.96), rgba(8,37,29,.98)); transform: translateY(-1px); box-shadow: inset 0 0 0 1px rgba(245,210,127,.18), 0 10px 18px rgba(0,0,0,.24); }
+.shop-item.locked { opacity: .62; filter: saturate(.55); }
+.shop-item.sold-out { border-color: #6d674d; background: linear-gradient(145deg, rgba(22,43,35,.82), rgba(5,25,20,.9)); }
+.shop-item.sold-out::after { content: "已售完"; position: absolute; right: -31px; top: 12px; width: 112px; padding: 4px 0; color: #2b1a08; background: #d1a550; box-shadow: 0 2px 7px #000; font-size: 10px; font-weight: 900; letter-spacing: .12em; text-align: center; transform: rotate(38deg); }
+.shop-item > div { align-self: center; min-width: 0; }
+.shop-item > div small { color: #b3aa90; }
+.shop-item h2 { margin: 5px 0 7px; color: #fff1c6; font-size: 20px; }
+.shop-item p { overflow: hidden; color: #aaa892; text-overflow: ellipsis; white-space: nowrap; }
+.shop-item > strong { grid-column: 2; align-self: end; min-height: 28px; display: flex; align-items: center; justify-content: center; padding: 5px 10px; border: 1px solid rgba(206,164,76,.38); border-radius: 6px; color: #f1cd70; background: rgba(144,100,37,.13); font-size: 12px; }
+.shop-item.sold-out > strong { color: #a8a38f; border-color: rgba(148,145,125,.26); background: rgba(0,0,0,.16); }
+
+.shop-item-icon {
+  width: 78px;
+  height: 78px;
+  align-self: center;
+  border-radius: 12px;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: contain;
+  filter: drop-shadow(0 7px 8px rgba(0,0,0,.38));
+}
+.shop-item-icon.trash { color: transparent; border-color: rgba(228,190,111,.36); background-color: #70562e; background-image: url('./assets/devices/trash-bin-v1.webp'); background-size: 94%; filter: brightness(1.48) contrast(1.04) drop-shadow(0 7px 8px rgba(0,0,0,.38)); }
+.shop-item-icon.fan { color: transparent; border-color: rgba(196,155,85,.26); background-color: rgba(0,0,0,.16); background-image: url('./assets/devices/desk-fan-v1.webp'); }
+.shop-item-icon.robot { color: transparent; border-color: rgba(228,190,111,.36); background-color: #70562e; background-image: url('./assets/devices/scratch-robot-v1.webp'); background-size: 112%; filter: brightness(1.38) contrast(1.03) drop-shadow(0 7px 8px rgba(0,0,0,.38)); }
+
+.shop-detail {
+  min-height: 480px;
+  padding: 26px;
+  border: 1px solid #765c30;
+  border-radius: 14px;
+  background: linear-gradient(155deg, rgba(16,52,40,.96), rgba(4,22,17,.98));
+  box-shadow: inset 0 0 34px rgba(0,0,0,.22);
+}
+.shop-detail-title { min-height: 84px; padding-bottom: 14px; border-bottom: 1px solid rgba(210,170,83,.18); }
+.shop-detail-title .shop-item-icon { flex: 0 0 78px; }
+.shop-detail-title h2 { color: #fff0bf; font-size: 28px; }
+.shop-detail > p { min-height: 54px; margin: 15px 0 10px; }
+.effect-change > div { border: 1px solid rgba(177,147,86,.12); background: rgba(255,255,255,.035); }
+.shop-costs { padding: 12px 14px; border-radius: 9px; background: rgba(0,0,0,.12); }
+.shop-upgrade { min-height: 54px; margin-top: 8px; border-radius: 9px; font-size: 15px; }
+.upgrade-confirm { margin-top: 12px; padding: 15px; border: 1px solid #a87e36; border-radius: 10px; background: rgba(65,45,18,.34); }
+.upgrade-confirm p { min-height: 34px; margin: 0 0 12px; }
+.upgrade-confirm > div { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.upgrade-confirm button { width: 100%; min-height: 50px; margin: 0; border-radius: 8px; font-size: 14px; font-weight: 900; }
+.upgrade-confirm .secondary-button { border: 1px solid #7f6a42; color: #e5d5a7; background: linear-gradient(#173c30, #0b2a21); }
+.max-level-badge { min-height: 54px; display: grid; place-items: center; border: 1px solid #7b765a; border-radius: 9px; color: #c9c2a9; background: linear-gradient(90deg, rgba(35,46,39,.72), rgba(21,31,27,.82)); font-weight: 900; letter-spacing: .08em; }
+
+/* Final production device sprites replace the earlier CSS placeholders. */
+.fan-station {
+  left: 30%;
+  top: 1.8%;
+  width: 12%;
+  min-width: 142px;
+  aspect-ratio: .86;
+  overflow: visible;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: url('./assets/devices/desk-fan-v1.webp') center / contain no-repeat;
+  box-shadow: none;
+  filter: drop-shadow(0 15px 12px rgba(0,0,0,.46));
+}
+.fan-station > span { display: none; }
+.fan-station strong { position: absolute; left: 17%; right: 17%; bottom: 2%; width: auto; padding: 6px 3px; border: 1px solid #a77b37; border-radius: 5px; color: #291908; background: linear-gradient(#e4c271, #95652b); box-shadow: inset 0 1px #fff0b4, 0 4px 8px rgba(0,0,0,.38); }
+.fan-station.locked { border: 0; filter: saturate(.72) drop-shadow(0 15px 12px rgba(0,0,0,.46)); }
+.fan-station.working { border: 0; filter: brightness(1.12) drop-shadow(0 0 18px rgba(226,183,82,.62)); animation: device-working .4s ease-in-out infinite alternate; }
+.fan-station.working > span { display: none; }
+
+.robot-station {
+  right: 4.2%;
+  bottom: 24%;
+  width: 21%;
+  min-width: 245px;
+  min-height: 29%;
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: url('./assets/devices/scratch-robot-v1.webp') center / contain no-repeat;
+  box-shadow: none;
+  filter: drop-shadow(0 20px 16px rgba(0,0,0,.52));
+}
+.robot-station::before, .robot-station > span { display: none; }
+.robot-station > strong { position: absolute; left: 22%; right: 29%; bottom: 9%; padding: 5px 4px; color: #2b1a08; background: linear-gradient(#dfb85f, #865a27); box-shadow: inset 0 0 0 1px #f1d78e, 0 3px 7px #000; }
+.robot-station > small { position: absolute; left: 20%; right: 27%; bottom: 1%; color: #f0ddb1; text-shadow: 0 2px 4px #000; }
+.robot-station.locked { border: 0; opacity: .82; filter: saturate(.7) drop-shadow(0 20px 16px rgba(0,0,0,.52)); }
+
+.trash-drop-zone {
+  right: 1.2%;
+  bottom: -2%;
+  width: 11.5%;
+  height: 25%;
+  min-width: 136px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: url('./assets/devices/trash-bin-v1.webp') center / contain no-repeat;
+  box-shadow: none;
+  filter: drop-shadow(0 16px 13px rgba(0,0,0,.56));
+}
+.trash-drop-zone::before { display: none; }
+.trash-drop-zone strong { position: absolute; left: 17%; right: 17%; bottom: 11%; padding: 5px 3px; border: 1px solid #98713a; border-radius: 5px; color: #f3daa0; background: rgba(10,21,18,.86); }
+.trash-drop-zone button { position: absolute; left: 13%; right: 13%; bottom: 1%; width: auto; margin: 0; color: #2a1907; background: linear-gradient(#e3c06d, #95662c); }
+.trash-drop-zone.locked-zone { border: 0; filter: saturate(.72) drop-shadow(0 16px 13px rgba(0,0,0,.56)); }
+.trash-drop-zone.locked-zone::after { content: "未购买"; top: 8%; right: 9%; padding: 3px 6px; border-radius: 99px; color: #f0d493; background: rgba(6,24,19,.78); }
+
+@keyframes device-working { to { transform: translateY(-2px) rotate(.5deg); } }
+
+@media (max-width: 700px) {
+  .shop-backdrop { padding: 0; }
+  .shop-dialog { width: 100vw; min-height: 100vh; max-height: 100vh; border-width: 0; border-radius: 0; }
+  .shop-header { min-height: 82px; padding: 16px 62px 13px 16px; }
+  .shop-header h1 { font-size: 27px; }
+  .shop-balance { min-width: 0; padding: 7px 9px; }
+  .shop-balance small { display: none; }
+  .shop-balance strong { max-width: 130px; overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+  .shop-tabs { padding: 9px 12px; }
+  .shop-tabs button { min-width: 94px; }
+  .shop-layout { grid-template-columns: 1fr; padding: 12px 14px 24px; }
+  .shop-items { grid-template-columns: 1fr; }
+  .shop-item { min-height: 126px; grid-template-columns: 56px 1fr; padding: 12px; }
+  .shop-item-icon { width: 54px; height: 54px; }
+  .shop-item h2 { font-size: 16px; }
+  .shop-detail { min-height: 0; padding: 18px; }
+  .shop-detail-title .shop-item-icon { flex-basis: 64px; width: 64px; height: 64px; }
+  .fan-station { left: 2%; top: 1.8%; width: 26%; min-width: 0; }
+  .robot-station { right: 0; bottom: 22%; width: 39%; min-width: 0; min-height: 17%; }
+  .trash-drop-zone { right: -3%; bottom: 1%; width: 28%; min-width: 105px; height: 19%; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }

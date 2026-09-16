@@ -11,6 +11,13 @@ import ticketArtwork from './assets/concepts/lingqian-ticket-play-v1.webp'
 
 const coinFormatter = new Intl.NumberFormat('zh-CN')
 
+function newIdempotencyKey(prefix: string) {
+  if (typeof globalThis.crypto?.randomUUID === 'function') {
+    return `${prefix}-${globalThis.crypto.randomUUID()}`
+  }
+  return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 14)}`
+}
+
 function updateUnlocks(cards: Card[], balance: number) {
   return cards.map((card) => ({ ...card, unlocked: balance >= card.price }))
 }
@@ -226,7 +233,7 @@ export function App() {
     setBusy(true)
     setNotice('')
     try {
-      const result = await api.purchase(card.code, crypto.randomUUID())
+      const result = await api.purchase(card.code, newIdempotencyKey('card'))
       setUser(result.user)
       setCards((current) => updateUnlocks(current, result.user.balance))
       setTickets((current) => [result.ticket, ...current.filter((ticket) => ticket.id !== result.ticket.id)])
@@ -285,7 +292,7 @@ export function App() {
     if (busy || !item.nextPrice) return
     setBusy(true)
     try {
-      const result = await api.upgradeItem(item.code, crypto.randomUUID())
+      const result = await api.upgradeItem(item.code, newIdempotencyKey('item'))
       setUser(result.user)
       setCards((current) => updateUnlocks(current, result.user.balance))
       setShop(result.shop)
@@ -586,7 +593,7 @@ export function App() {
     setFanBusy(true)
     setFanHolding(true)
     try {
-      const result = await api.blowFan(crypto.randomUUID(), fanRiskPending || Boolean(fan?.riskAcknowledged))
+      const result = await api.blowFan(newIdempotencyKey('fan'), fanRiskPending || Boolean(fan?.riskAcknowledged))
       setUser(result.user)
       setFan(result.fan)
       setRobot(result.robot)

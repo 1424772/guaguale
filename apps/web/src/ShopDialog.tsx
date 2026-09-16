@@ -80,13 +80,17 @@ export function ShopDialog({ user, shop, busy, initialItemCode, onClose, onUpgra
 
         <div className="shop-layout">
           <div className="shop-items">
-            {visibleItems.map((item) => (
-              <button type="button" key={item.code} className={`shop-item ${selected.code === item.code ? 'selected' : ''}`} onClick={() => setSelectedCode(item.code)}>
-                <span className={`shop-item-icon ${item.code}`}>{itemMeta[item.code].icon}</span>
-                <div><small>{itemMeta[item.code].group}</small><h2>{item.name}</h2><p>{item.locked ? item.lockedReason : item.maxLevel === 1 ? item.effectText : `等级 ${item.level} / ${item.maxLevel}`}</p></div>
-                <strong>{item.locked ? '需要前置' : item.level >= item.maxLevel ? (item.maxLevel === 1 ? '已拥有' : '已满级') : `${coins.format(item.nextPrice ?? 0)} 金币`}</strong>
-              </button>
-            ))}
+            {visibleItems.map((item) => {
+              const itemMaxed = item.level >= item.maxLevel
+              const itemSoldOut = itemMaxed && item.maxLevel === 1
+              return (
+                <button type="button" key={item.code} aria-pressed={selected.code === item.code} className={`shop-item ${selected.code === item.code ? 'selected' : ''} ${item.locked ? 'locked' : ''} ${itemSoldOut ? 'sold-out' : ''}`} onClick={() => setSelectedCode(item.code)}>
+                  <span className={`shop-item-icon ${item.code}`}>{itemMeta[item.code].icon}</span>
+                  <div><small>{itemMeta[item.code].group}</small><h2>{item.name}</h2><p>{item.locked ? item.lockedReason : item.maxLevel === 1 ? item.effectText : `等级 ${item.level} / ${item.maxLevel}`}</p></div>
+                  <strong>{item.locked ? '需要前置' : itemMaxed ? (itemSoldOut ? '已售完' : '已满级') : `${coins.format(item.nextPrice ?? 0)} 金币`}</strong>
+                </button>
+              )
+            })}
           </div>
 
           <article className="shop-detail">
@@ -131,7 +135,7 @@ export function ShopDialog({ user, shop, busy, initialItemCode, onClose, onUpgra
               </div>
             )}
 
-            {selected.locked ? <div className="locked-item-badge">{selected.lockedReason}</div> : maxed ? <div className="max-level-badge">{oneTime ? '已永久拥有' : '已达到最高等级'}</div> : confirming ? (
+            {selected.locked ? <div className="locked-item-badge">{selected.lockedReason}</div> : maxed ? <div className="max-level-badge">{oneTime ? '已售完 · 永久拥有' : '已达到最高等级'}</div> : confirming ? (
               <div className="upgrade-confirm">
                 <p>确认花费 <strong>{coins.format(nextPrice)} 金币</strong>{oneTime ? `购买“${selected.name}”` : `将“${selected.name}”升级到 ${selected.level + 1} 级`}？</p>
                 <div><button type="button" className="secondary-button" onClick={() => setConfirming(false)} disabled={busy}>取消</button><button type="button" className="gold-button" onClick={() => onUpgrade(selected)} disabled={busy}>{busy ? `${action}中…` : `确认${action}`}</button></div>
