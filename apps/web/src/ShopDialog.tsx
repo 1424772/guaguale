@@ -14,7 +14,7 @@ type Props = {
 }
 
 const itemMeta: Record<ShopItem['code'], { icon: string; group: string }> = {
-  luck: { icon: '✦', group: '长期成长' },
+  luck: { icon: '🍀', group: '长期成长' },
   'scratch-range': { icon: '⌁', group: '操作效率' },
   trash: { icon: '🗑', group: '桌面整理' },
   'card-slots': { icon: '▥', group: '刮刮乐保护' },

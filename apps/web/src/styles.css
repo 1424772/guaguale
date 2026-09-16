@@ -1265,6 +1265,7 @@ button { color: inherit; }
   background-size: contain;
   filter: drop-shadow(0 7px 8px rgba(0,0,0,.38));
 }
+.shop-item-icon.luck { border-color: #b99a50; background: radial-gradient(circle at 34% 28%, #6fbe72, #24633f 56%, #103326); text-shadow: 0 2px 5px rgba(0,0,0,.35); }
 .shop-item-icon.trash { color: transparent; border-color: rgba(228,190,111,.36); background-color: #70562e; background-image: url('./assets/devices/trash-bin-v1.webp'); background-size: 94%; filter: brightness(1.48) contrast(1.04) drop-shadow(0 7px 8px rgba(0,0,0,.38)); }
 .shop-item-icon.fan { color: transparent; border-color: rgba(196,155,85,.26); background-color: rgba(0,0,0,.16); background-image: url('./assets/devices/desk-fan-v1.webp'); }
 .shop-item-icon.robot { color: transparent; border-color: rgba(228,190,111,.36); background-color: #70562e; background-image: url('./assets/devices/scratch-robot-v1.webp'); background-size: 112%; filter: brightness(1.38) contrast(1.03) drop-shadow(0 7px 8px rgba(0,0,0,.38)); }
