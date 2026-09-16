@@ -1489,3 +1489,173 @@ html, body, #root { width: 100%; height: 100%; margin: 0; overflow: hidden; }
   .scratch-zoom-layer { padding: 7% 4% 3%; }
   .scratch-dialog .result-box p, .scratch-dialog .special-card-rule { display: none; }
 }
+
+/* Ticket presentation v4: the tray is real inventory and opened tickets keep their authored layout. */
+.catalog-shop-entry {
+  position: absolute;
+  z-index: 32;
+  left: 3.2%;
+  top: 6%;
+  width: clamp(155px, 14vw, 220px);
+  min-height: 62px;
+  display: grid;
+  grid-template-columns: 46px 1fr;
+  grid-template-rows: 1fr 1fr;
+  align-items: center;
+  gap: 0 10px;
+  padding: 9px 14px;
+  border: 2px solid #80602e;
+  border-radius: 8px;
+  color: #f6df9d;
+  background: linear-gradient(145deg, rgba(19,48,39,.97), rgba(6,25,20,.98));
+  box-shadow: inset 0 0 0 1px #d1a956, inset 0 -9px 18px rgba(0,0,0,.28), 0 10px 18px rgba(0,0,0,.46);
+  cursor: pointer;
+}
+.catalog-shop-entry::before, .catalog-shop-entry::after { content: ""; position: absolute; top: 7px; bottom: 7px; width: 5px; border-top: 1px solid #c9a259; border-bottom: 1px solid #c9a259; }
+.catalog-shop-entry::before { left: -3px; }
+.catalog-shop-entry::after { right: -3px; }
+.catalog-shop-entry > span { grid-row: 1 / 3; display: grid; place-items: center; width: 42px; height: 42px; border: 1px solid #b78e43; border-radius: 50%; color: #241608; background: radial-gradient(circle at 35% 30%, #f0d27d, #9c6c27 70%); font: 900 20px/1 Georgia, serif; }
+.catalog-shop-entry strong { align-self: end; font: 900 15px/1.2 Georgia, "Songti SC", serif; }
+.catalog-shop-entry small { align-self: start; color: #9e947a; font-size: 9px; }
+
+.movable-ticket {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  filter: drop-shadow(0 13px 9px rgba(0,0,0,.48)) drop-shadow(0 2px 1px rgba(41,21,8,.72));
+}
+.ticket-artwork {
+  z-index: 0;
+  inset: -2%;
+  width: 104%;
+  height: 104%;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  object-fit: fill;
+  clip-path: polygon(.8% 4%, 3% 1%, 16% 2.2%, 29% .5%, 44% 1.8%, 57% .4%, 72% 2%, 87% .7%, 98.8% 3.5%, 99.5% 18%, 98.7% 35%, 99.6% 53%, 98.5% 73%, 99.2% 96%, 87% 98.7%, 73% 97.8%, 58% 99.4%, 43% 98%, 28% 99.2%, 12% 97.6%, 1.2% 96%, .5% 78%, 1.4% 61%, .4% 42%, 1.3% 23%);
+  filter: contrast(1.035) saturate(.96);
+}
+.movable-ticket::before {
+  content: "";
+  position: absolute;
+  z-index: 1;
+  inset: 1.5%;
+  clip-path: polygon(.8% 4%, 3% 1%, 16% 2.2%, 29% .5%, 44% 1.8%, 57% .4%, 72% 2%, 87% .7%, 98.8% 3.5%, 99.5% 18%, 98.7% 35%, 99.6% 53%, 98.5% 73%, 99.2% 96%, 87% 98.7%, 73% 97.8%, 58% 99.4%, 43% 98%, 28% 99.2%, 12% 97.6%, 1.2% 96%, .5% 78%, 1.4% 61%, .4% 42%, 1.3% 23%);
+  border: 1px solid rgba(255,235,183,.34);
+  background: repeating-linear-gradient(102deg, transparent 0 9px, rgba(255,255,255,.035) 10px 11px, transparent 12px 19px);
+  box-shadow: inset 0 0 11px rgba(62,31,10,.36);
+  mix-blend-mode: soft-light;
+  pointer-events: none;
+}
+.movable-ticket::after { content: ""; position: absolute; z-index: 2; inset: 2%; border: 1px solid rgba(52,28,11,.25); clip-path: inherit; pointer-events: none; }
+
+.scratch-dialog {
+  --scratch-x: 10%;
+  --scratch-y: 35%;
+  --scratch-w: 80%;
+  --scratch-h: 34%;
+  width: min(1040px, 94vw);
+  aspect-ratio: 1672 / 941;
+  max-height: 90vh;
+  filter: drop-shadow(0 32px 45px rgba(0,0,0,.75));
+}
+.scratch-dialog-lingqian-ticket { --scratch-x: 10.6%; --scratch-y: 36.2%; --scratch-w: 78.8%; --scratch-h: 30.2%; aspect-ratio: 2 / 1; }
+.scratch-dialog-street-store { --scratch-x: 12.5%; --scratch-y: 26.2%; --scratch-w: 75.8%; --scratch-h: 49.2%; aspect-ratio: 1619 / 971; }
+.scratch-dialog-arcade-challenge { --scratch-x: 33.1%; --scratch-y: 23.5%; --scratch-w: 34.2%; --scratch-h: 54.5%; }
+.scratch-dialog-gold-mine { --scratch-x: 10.1%; --scratch-y: 29.7%; --scratch-w: 80.2%; --scratch-h: 43.3%; }
+.scratch-dialog-rocket-launch { --scratch-x: 5.2%; --scratch-y: 40%; --scratch-w: 72.2%; --scratch-h: 33%; }
+.scratch-dialog-deep-sea-salvage { --scratch-x: 17.6%; --scratch-y: 21.2%; --scratch-w: 66.6%; --scratch-h: 51.4%; }
+.scratch-dialog-eternal-color-diamond { --scratch-x: 5.4%; --scratch-y: 49.4%; --scratch-w: 89.4%; --scratch-h: 21.8%; }
+.scratch-dialog-all-in { --scratch-x: 31.7%; --scratch-y: 8.2%; --scratch-w: 37.5%; --scratch-h: 64%; }
+.scratch-zoom-artwork {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-height: none;
+  aspect-ratio: auto;
+  object-fit: fill;
+  border: 0;
+  border-radius: 4px;
+  clip-path: polygon(.6% 2%, 9% .7%, 19% 1.4%, 31% .4%, 44% 1.2%, 56% .3%, 70% 1.5%, 83% .5%, 99% 2.2%, 99.6% 18%, 99.1% 39%, 99.7% 62%, 99% 83%, 99.4% 98%, 85% 99.2%, 69% 98.6%, 55% 99.5%, 39% 98.7%, 24% 99.4%, 11% 98.5%, .7% 97.7%, .3% 79%, .9% 58%, .2% 37%, .8% 17%);
+  box-shadow: none;
+  filter: contrast(1.025) saturate(.98);
+}
+.scratch-zoom-layer { position: absolute; inset: 0; display: block; padding: 0; background: transparent; }
+.scratch-dialog .scratch-card { position: absolute; inset: 0; display: block; }
+.scratch-dialog .scratch-stage {
+  position: absolute;
+  left: var(--scratch-x);
+  top: var(--scratch-y);
+  width: var(--scratch-w);
+  height: var(--scratch-h);
+  max-height: none;
+  aspect-ratio: auto !important;
+  overflow: hidden;
+  border: 0;
+  border-radius: 7px;
+  background: rgba(232,222,190,.96);
+  box-shadow: inset 0 0 10px rgba(39,23,12,.26), 0 1px 2px rgba(255,255,255,.5);
+}
+.scratch-dialog-arcade-challenge .scratch-stage, .scratch-dialog-rocket-launch .scratch-stage, .scratch-dialog-all-in .scratch-stage { background: rgba(7,18,30,.92); }
+.scratch-dialog-gold-mine .scratch-stage { background: rgba(20,17,15,.92); }
+.scratch-dialog-deep-sea-salvage .scratch-stage { background: rgba(4,49,65,.92); }
+.scratch-dialog-eternal-color-diamond .scratch-stage { background: rgba(235,230,250,.92); }
+.scratch-dialog .scratch-progress, .scratch-dialog .scratch-card > p { display: none; }
+.scratch-dialog .symbol { border: 1px solid rgba(40,30,18,.15); border-radius: 6px; overflow: hidden; }
+.scratch-dialog-deep-sea-salvage .symbol { border-radius: 50%; }
+.scratch-dialog .symbol span { font-size: clamp(20px, 3.2vw, 51px); }
+.scratch-dialog .symbol small { display: none; }
+.scratch-dialog .scratch-layer { border-radius: inherit; }
+.scratch-dialog > .close-button { top: -18px; right: -18px; border-color: #bd9145; box-shadow: 0 5px 14px rgba(0,0,0,.55); }
+.scratch-dialog .result-ticket {
+  position: absolute;
+  left: var(--scratch-x);
+  top: var(--scratch-y);
+  width: var(--scratch-w);
+  height: var(--scratch-h);
+  max-height: none;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: 7px;
+}
+.scratch-dialog .result-ticket > div { width: 100%; height: 100%; margin: 0; gap: 2px; }
+.scratch-dialog .result-ticket strong { min-height: 0; border-radius: 5px; font-size: clamp(20px, 3.1vw, 50px); }
+.scratch-dialog .result-ticket-street-store .count-7, .scratch-dialog .result-ticket-gold-mine .count-7 { grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(2, 1fr); }
+.scratch-dialog .result-ticket-street-store .count-7 strong:nth-child(7) { grid-column: 4; grid-row: 1 / 3; }
+.scratch-dialog .result-ticket-gold-mine .count-7 { grid-auto-flow: row dense; }
+.scratch-dialog .result-ticket-gold-mine .count-7 strong:nth-child(1) { grid-column: 1; grid-row: 1 / 3; }
+.scratch-dialog .result-box {
+  position: absolute;
+  z-index: 5;
+  left: 18%;
+  right: 18%;
+  bottom: 2.5%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 50px;
+  margin: 0;
+  padding: 7px 12px;
+  border: 1px solid rgba(218,177,89,.65);
+  border-radius: 10px;
+  background: rgba(5,23,18,.9);
+  backdrop-filter: blur(7px);
+}
+.scratch-dialog .result-box small, .scratch-dialog .result-box p { display: none; }
+.scratch-dialog .result-box h2 { margin: 0; color: #ffe29a; font-size: clamp(14px, 1.6vw, 21px); }
+.scratch-dialog .result-box button { width: auto; min-height: 35px; margin: 0; padding: 7px 14px; }
+.scratch-dialog .special-card-rule { display: none; }
+
+@media (max-width: 700px) {
+  .catalog-shop-entry { left: 3%; top: 3%; width: 144px; min-height: 50px; grid-template-columns: 35px 1fr; padding: 6px 9px; }
+  .catalog-shop-entry > span { width: 32px; height: 32px; font-size: 15px; }
+  .catalog-shop-entry strong { font-size: 12px; }
+  .scratch-dialog { width: 98vw; }
+  .scratch-dialog > .close-button { top: -12px; right: 2px; }
+  .scratch-dialog .result-box { left: 5%; right: 5%; bottom: 1%; min-height: 40px; }
+}

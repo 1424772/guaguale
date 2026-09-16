@@ -726,11 +726,17 @@ export function App() {
       </div>}
 
       <section className="desk">
-        <button type="button" className="catalog-dock" onClick={() => setCatalogOpen(true)} aria-label={`打开刮刮乐商店，${trayTickets.length}张刮刮乐等待放置`}>
-          <span className="catalog-stack" aria-hidden="true"><i /><i /><i /></span>
-          <strong>刮刮乐商店</strong>
-          <small>{trayTickets.length ? `${trayTickets.length} 张待放置` : '选购刮刮乐'}</small>
-        </button>
+        {trayTickets.length > 0 ? (
+          <button type="button" className="catalog-dock" onClick={() => setCatalogOpen(true)} aria-label={`打开刮刮乐托盘，${trayTickets.length}张刮刮乐等待放置`}>
+            <span className="catalog-stack" aria-hidden="true"><i /><i /><i /></span>
+            <strong>刮刮乐托盘</strong>
+            <small>{trayTickets.length} 张待放置</small>
+          </button>
+        ) : (
+          <button type="button" className="catalog-shop-entry" onClick={() => setCatalogOpen(true)} aria-label="打开刮刮乐商店">
+            <span aria-hidden="true">券</span><strong>刮刮乐商店</strong><small>选购新刮刮乐</small>
+          </button>
+        )}
 
         {catalogOpen && <button type="button" className="catalog-scrim" onClick={() => setCatalogOpen(false)} aria-label="关闭刮刮乐商店" />}
         {catalogOpen && <aside className="catalog-panel">

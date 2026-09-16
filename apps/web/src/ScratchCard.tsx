@@ -110,6 +110,29 @@ export function symbolStateClassNames(cardCode: string, symbols: string[], index
 }
 
 function getCellBounds(cardCode: string, count: number, columns: number, width: number, height: number): CellBounds[] {
+  if (cardCode === 'street-store') {
+    const gap = width * .014
+    const cellWidth = width * .225
+    const cellHeight = height * .455
+    return Array.from({ length: count }, (_, index) => index < 6
+      ? {
+          x: width * .01 + (index % 3) * (cellWidth + gap),
+          y: height * .02 + Math.floor(index / 3) * (cellHeight + height * .04),
+          width: cellWidth,
+          height: cellHeight,
+        }
+      : { x: width * .735, y: height * .15, width: width * .255, height: height * .7 })
+  }
+  if (cardCode === 'gold-mine') {
+    return Array.from({ length: count }, (_, index) => index === 0
+      ? { x: width * .01, y: height * .08, width: width * .32, height: height * .84 }
+      : {
+          x: width * .48 + ((index - 1) % 3) * width * .175,
+          y: height * .05 + Math.floor((index - 1) / 3) * height * .49,
+          width: width * .15,
+          height: height * .42,
+        })
+  }
   if (cardCode === 'eternal-color-diamond') {
     const gap = 12
     const margin = 18
@@ -145,6 +168,7 @@ export function ScratchCard({ cardCode, cardName, symbols, scratchLevel, prizeTi
   const rangePercent = scratchEffects[Math.max(1, Math.min(10, scratchLevel))]
   const brushRadius = Math.max(6, stageHeight * rangePercent / 200)
   const tripleMatch = symbols.length === 3 && new Set(symbols).size === 1
+  const cellBounds = getCellBounds(cardCode, symbols.length, columns, 720, stageHeight)
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -164,38 +188,70 @@ export function ScratchCard({ cardCode, cardName, symbols, scratchLevel, prizeTi
     setProgress(0)
     context.scale(ratio, ratio)
     const gradient = context.createLinearGradient(0, 0, width, height)
-    gradient.addColorStop(0, '#d9d7ce')
-    gradient.addColorStop(0.45, '#a7a8a5')
-    gradient.addColorStop(1, '#e7e2d4')
+    gradient.addColorStop(0, '#85898a')
+    gradient.addColorStop(0.22, '#c8c9c5')
+    gradient.addColorStop(0.48, '#9b9e9d')
+    gradient.addColorStop(0.72, '#dad7ce')
+    gradient.addColorStop(1, '#777b7d')
     context.fillStyle = gradient
     context.textAlign = 'center'
     if (cardCode === 'eternal-color-diamond') {
       const gap = 12
       const margin = 18
       const cellWidth = (width - margin * 2 - gap * 4) / 5
-      diamondAppraisals.forEach((label, index) => {
+      diamondAppraisals.forEach((_, index) => {
         const x = margin + index * (cellWidth + gap)
         context.beginPath()
         context.roundRect(x, 18, cellWidth, height - 36, 13)
         context.fill()
-        context.fillStyle = 'rgba(53, 55, 72, .58)'
-        context.font = '700 18px system-ui'
-        context.fillText(label, x + cellWidth / 2, height / 2 + 6)
         context.fillStyle = gradient
       })
     } else if (cardCode === 'all-in') {
       context.beginPath()
       context.arc(width / 2, height / 2, 105, 0, Math.PI * 2)
       context.fill()
-      context.fillStyle = 'rgba(44, 26, 25, .68)'
-      context.font = '800 24px system-ui'
-      context.fillText('最终抉择', width / 2, height / 2 + 8)
+    } else if (cardCode === 'street-store' || cardCode === 'arcade-challenge' || cardCode === 'gold-mine' || cardCode === 'rocket-launch') {
+      const coatingCells = getCellBounds(cardCode, symbols.length, columns, width, height)
+      coatingCells.forEach((cell) => {
+        context.beginPath()
+        context.roundRect(cell.x + 4, cell.y + 4, cell.width - 8, cell.height - 8, Math.min(16, cell.height * .1))
+        context.fill()
+      })
+    } else if (cardCode === 'deep-sea-salvage') {
+      const coatingCells = getCellBounds(cardCode, symbols.length, columns, width, height)
+      coatingCells.forEach((cell) => {
+        context.beginPath()
+        context.ellipse(cell.x + cell.width / 2, cell.y + cell.height / 2, cell.width * .43, cell.height * .43, 0, 0, Math.PI * 2)
+        context.fill()
+      })
     } else {
       context.fillRect(0, 0, width, height)
-      context.fillStyle = 'rgba(60, 65, 66, .38)'
-      context.font = '700 26px system-ui'
-      context.fillText('按住并刮开', width / 2, height / 2 + 8)
     }
+    context.save()
+    context.globalCompositeOperation = 'source-atop'
+    context.lineWidth = 1
+    for (let offset = -height; offset < width + height; offset += 19) {
+      context.strokeStyle = offset % 38 === 0 ? 'rgba(255,255,255,.18)' : 'rgba(42,46,47,.12)'
+      context.beginPath()
+      context.moveTo(offset, height)
+      context.lineTo(offset + height, 0)
+      context.stroke()
+    }
+    for (let index = 0; index < 86; index++) {
+      const x = (index * 83 + 17) % width
+      const y = (index * 47 + 29) % height
+      const radius = 1 + (index % 3) * .65
+      context.fillStyle = index % 2 ? 'rgba(245,242,230,.2)' : 'rgba(45,47,48,.18)'
+      context.beginPath()
+      context.arc(x, y, radius, 0, Math.PI * 2)
+      context.fill()
+    }
+    if (cardCode === 'lingqian-ticket') {
+      context.fillStyle = 'rgba(45,48,47,.16)'
+      context.font = '800 40px Georgia, serif'
+      for (let x = 78; x < width; x += 175) context.fillText('$', x, height / 2 + 14)
+    }
+    context.restore()
     const cells = getCellBounds(cardCode, symbols.length, columns, width, height)
     const initialPixels = context.getImageData(0, 0, canvas.width, canvas.height).data
     opaqueIndexesRef.current = cells.map((cell) => {
@@ -274,13 +330,19 @@ export function ScratchCard({ cardCode, cardName, symbols, scratchLevel, prizeTi
           <strong>{cardCode === 'eternal-color-diamond' ? '五项彩钻鉴定' : cardCode === 'all-in' ? '唯一终局刮层' : `${symbols.length} 格刮奖区域`}</strong>
         </div>
       <div className="scratch-stage" style={{ aspectRatio: `720 / ${stageHeight}` }}>
-        <div className="symbols" aria-hidden={!complete} style={{ gridTemplateColumns: `repeat(${columns}, 1fr)` }}>
+        <div className="symbols" aria-hidden={!complete} style={{ display: 'block' }}>
           {symbols.map((symbol, index) => {
             const visual = getSymbolVisual(symbol)
             const revealed = revealedIndexes.includes(index)
             const stateClasses = symbolStateClassNames(cardCode, symbols, index, complete)
+            const cell = cellBounds[index]
             return (
-              <div className={`symbol symbol-${symbolClassName(symbol)} ${revealed ? 'revealed' : ''} ${stateClasses}`} key={`${symbol}-${index}`} aria-label={visual.label}>
+              <div
+                className={`symbol symbol-${symbolClassName(symbol)} ${revealed ? 'revealed' : ''} ${stateClasses}`}
+                key={`${symbol}-${index}`}
+                aria-label={visual.label}
+                style={{ position: 'absolute', left: `${cell.x / 7.2}%`, top: `${cell.y / stageHeight * 100}%`, width: `${cell.width / 7.2}%`, height: `${cell.height / stageHeight * 100}%` }}
+              >
                 <span>{visual.emoji}</span>
                 <small>{symbol.startsWith('目标·') ? `目标：${visual.label}` : visual.label}</small>
               </div>
