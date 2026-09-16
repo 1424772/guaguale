@@ -1,5 +1,6 @@
 import { PointerEvent, RefObject, useEffect, useState } from 'react'
 import type { Ticket } from './api'
+import { ticketArtworkFor } from './ticketArtwork'
 
 export type DeskPlacement = {
   deskX: number
@@ -16,12 +17,13 @@ type DeskTicketProps = {
   onPin: (ticket: Ticket) => void
   onRobot: (ticket: Ticket) => void
   fanAction?: 'discarded' | 'robot' | 'caught' | 'safe'
+  motion?: 'robot-ejected' | 'redeeming' | 'discarding'
   onDrop: (ticket: Ticket, point: { x: number; y: number }, placement: DeskPlacement) => void
 }
 
 const clamp = (value: number, minimum: number, maximum: number) => Math.max(minimum, Math.min(maximum, value))
 
-export function DeskTicket({ ticket, deskRef, topZ, onOpen, onPin, onRobot, fanAction, onDrop }: DeskTicketProps) {
+export function DeskTicket({ ticket, deskRef, topZ, onOpen, onPin, onRobot, fanAction, motion, onDrop }: DeskTicketProps) {
   const [placement, setPlacement] = useState<DeskPlacement>({
     deskX: ticket.deskX,
     deskY: ticket.deskY,
@@ -70,7 +72,7 @@ export function DeskTicket({ ticket, deskRef, topZ, onOpen, onPin, onRobot, fanA
 
   return (
     <article
-      className={`movable-ticket state-${ticket.state} card-${ticket.cardCode} ${drag?.moved ? 'dragging' : ''} ${fanAction ? `fan-${fanAction}` : ''}`}
+      className={`movable-ticket state-${ticket.state} card-${ticket.cardCode} ${drag?.moved ? 'dragging' : ''} ${fanAction ? `fan-${fanAction}` : ''} ${motion ?? ''}`}
       style={{
         left: `${placement.deskX * 100}%`,
         top: `${placement.deskY * 100}%`,
@@ -98,6 +100,7 @@ export function DeskTicket({ ticket, deskRef, topZ, onOpen, onPin, onRobot, fanA
       onPointerUp={pointerEnd}
       onPointerCancel={() => setDrag(null)}
     >
+      <img className="ticket-artwork" src={ticketArtworkFor(ticket.cardCode)} alt="" draggable={false} />
       <span className="movable-ticket-name">{ticket.cardName}</span>
       <div className="movable-ticket-scratch">
         {ticket.state === 'purchased' ? <span>刮奖区</span> : <span>{ticket.reward ? `中奖 ${ticket.reward}` : '未中奖'}</span>}

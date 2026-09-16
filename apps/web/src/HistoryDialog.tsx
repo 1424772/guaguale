@@ -24,7 +24,7 @@ export function HistoryDialog({ events, loading, error, onClose, onRefresh }: Pr
       <section className="history-dialog" role="dialog" aria-modal="true" aria-label="游戏记录">
         <button className="close-button" type="button" onClick={onClose} aria-label="关闭">×</button>
         <header className="history-header">
-          <div><span className="eyebrow">ACTIVITY ARCHIVE</span><h1>游戏记录</h1><p>永久保留最近的购卡、刮奖、兑奖与丢弃结果。</p></div>
+          <div><span className="eyebrow">ACTIVITY ARCHIVE</span><h1>游戏记录</h1><p>永久保留最近的购买、刮奖、兑奖与丢弃结果。</p></div>
           <button type="button" className="secondary-button" onClick={onRefresh} disabled={loading}>刷新</button>
         </header>
         <nav className="history-filters" aria-label="记录筛选">
@@ -32,7 +32,7 @@ export function HistoryDialog({ events, loading, error, onClose, onRefresh }: Pr
         </nav>
         {loading && events.length === 0 ? <div className="dialog-loading"><span className="spinner" />正在整理记录…</div> : error ? (
           <div className="dialog-error"><strong>记录暂时无法读取</strong><span>{error}</span><button type="button" onClick={onRefresh}>重新加载</button></div>
-        ) : visible.length === 0 ? <div className="history-empty"><span>◇</span><strong>这个分类还没有记录</strong><small>完成一次购卡或刮奖后会显示在这里</small></div> : (
+        ) : visible.length === 0 ? <div className="history-empty"><span>◇</span><strong>这个分类还没有记录</strong><small>完成一次购买或刮奖后会显示在这里</small></div> : (
           <div className="history-timeline">
             {visible.map((event) => (
               <article className={`history-event event-${event.type}`} key={event.id}>

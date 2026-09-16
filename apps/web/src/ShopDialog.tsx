@@ -17,12 +17,12 @@ const itemMeta: Record<ShopItem['code'], { icon: string; group: string }> = {
   luck: { icon: '✦', group: '长期成长' },
   'scratch-range': { icon: '⌁', group: '操作效率' },
   trash: { icon: '🗑', group: '桌面整理' },
-  'card-slots': { icon: '▥', group: '卡片保护' },
+  'card-slots': { icon: '▥', group: '刮刮乐保护' },
   fan: { icon: '✺', group: '桌面整理' },
   robot: { icon: '▣', group: '自动刮奖' },
   'robot-speed': { icon: '⚡', group: '处理速度' },
   'robot-queue': { icon: '☷', group: '等待容量' },
-  'robot-intercept': { icon: '⬡', group: '卡片保护' },
+  'robot-intercept': { icon: '⬡', group: '刮刮乐保护' },
 }
 
 function percent(basisPoint: number) {

@@ -159,39 +159,21 @@ func (store *Store) TickRobot(ctx context.Context, userID uint64, now time.Time,
 	ticket.State = domain.TicketScratched
 	ticket.ScratchedAt = &now
 	event := &domain.RobotEvent{}
-	if ticket.Reward > 0 {
-		before := user.Balance
-		user.Balance += ticket.Reward
-		if _, err := tx.ExecContext(ctx, `UPDATE users SET balance = ?, balance_ranked_at = UTC_TIMESTAMP(6) WHERE id = ?`, user.Balance, user.ID); err != nil {
-			return domain.User{}, nil, nil, err
-		}
-		if _, err := tx.ExecContext(ctx, `UPDATE tickets SET state = 'redeemed', scratch_source = 'robot', scratched_at = ?, redeemed_at = ? WHERE id = ?`, now, now, ticket.ID); err != nil {
-			return domain.User{}, nil, nil, err
-		}
-		if _, err := tx.ExecContext(ctx, `
-			INSERT INTO coin_ledger
-				(user_id, idempotency_key, reason, reference_type, reference_id, delta, balance_before, balance_after)
-			VALUES (?, ?, 'robot_redeem', 'ticket', ?, ?, ?, ?)`,
-			user.ID, "robot-redeem:"+ticket.ID, ticket.ID, ticket.Reward, before, user.Balance,
-		); err != nil {
-			return domain.User{}, nil, nil, err
-		}
-		ticket.State = domain.TicketRedeemed
-		ticket.RedeemedAt = &now
-		event.AutoRedeemed = true
-	} else {
-		if _, err := tx.ExecContext(ctx, `
-			UPDATE tickets SET state = 'scratched', location = 'desk', desk_x = 0.780000, desk_y = 0.720000,
-				rotation = 3, z_index = z_index + 1, scratch_source = 'robot', scratched_at = ? WHERE id = ?`, now, ticket.ID,
-		); err != nil {
-			return domain.User{}, nil, nil, err
-		}
-		ticket.Location = domain.TicketOnDesk
-		ticket.DeskX = .78
-		ticket.DeskY = .72
-		ticket.Rotation = 3
-		ticket.ZIndex++
+	if _, err := tx.ExecContext(ctx, `
+		UPDATE tickets SET state = 'scratched', location = 'desk', desk_x = 0.805000, desk_y = 0.665000,
+			rotation = 3, z_index = z_index + 1, slot_index = NULL, scratch_source = 'robot',
+			scratched_at = ?, redeemed_at = NULL WHERE id = ?`, now, ticket.ID,
+	); err != nil {
+		return domain.User{}, nil, nil, err
 	}
+	ticket.Location = domain.TicketOnDesk
+	ticket.DeskX = .805
+	ticket.DeskY = .665
+	ticket.Rotation = 3
+	ticket.ZIndex++
+	ticket.SlotIndex = nil
+	ticket.ScratchSource = "robot"
+	ticket.RedeemedAt = nil
 	if _, err := tx.ExecContext(ctx, `DELETE FROM robot_queue WHERE id = ?`, jobID); err != nil {
 		return domain.User{}, nil, nil, err
 	}

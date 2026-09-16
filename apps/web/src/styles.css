@@ -1376,3 +1376,115 @@ button { color: inherit; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
+
+/* Interaction pass v3: real ticket art, viewport-safe layout and physical feedback. */
+html, body, #root { width: 100%; height: 100%; margin: 0; overflow: hidden; }
+.game-shell { width: 100%; height: 100dvh; min-height: 0; overflow: hidden; }
+.topbar { position: relative; z-index: 80; height: 64px; min-height: 64px; }
+.desk { height: calc(100dvh - 64px); min-height: 0; }
+
+.catalog-scrim { background: rgba(3, 9, 7, .72); backdrop-filter: blur(10px) saturate(.72); }
+.catalog-panel {
+  top: 82px;
+  bottom: 22px;
+  left: 50%;
+  width: min(1120px, calc(100vw - 44px));
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(390px, .95fr);
+  grid-template-rows: auto auto minmax(0, 1fr);
+  gap: 0 18px;
+  overflow: hidden;
+  border: 4px double #a47d3e;
+  border-radius: 20px;
+  background: linear-gradient(145deg, rgba(19,52,41,.995), rgba(5,23,18,.998) 72%);
+  box-shadow: 0 42px 110px rgba(0,0,0,.82), inset 0 0 0 1px rgba(255,225,153,.12);
+  animation: catalog-zoom-in .28s cubic-bezier(.2,.8,.25,1) both;
+  transform-origin: 12% 8%;
+}
+@keyframes catalog-zoom-in { from { opacity: 0; transform: translateX(-50%) scale(.9); } to { opacity: 1; transform: translateX(-50%) scale(1); } }
+.catalog-panel .panel-title { grid-column: 1 / -1; padding: 18px 72px 16px 24px; background: linear-gradient(90deg, rgba(7,30,24,.95), rgba(27,66,52,.86), rgba(6,27,22,.95)); }
+.catalog-panel .panel-title span { color: #ffe18a; font-size: 28px; }
+.catalog-panel .tray-inventory { grid-column: 1 / -1; min-height: 88px; margin: 14px 18px 4px; }
+.catalog-panel .tray-stack { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 8px; overflow-x: auto; }
+.catalog-panel .tray-stack > button { position: relative; min-height: 86px; grid-template-columns: 94px 1fr; grid-template-rows: auto auto auto; gap: 1px 9px; overflow: hidden; border: 1px solid rgba(210,174,93,.22); border-radius: 8px; background: rgba(255,255,255,.025); }
+.catalog-panel .tray-stack > button img { grid-row: 1 / 4; width: 94px; height: 56px; align-self: center; object-fit: contain; filter: drop-shadow(0 5px 5px rgba(0,0,0,.42)); }
+.catalog-panel .tray-stack > button span, .catalog-panel .tray-stack > button small, .catalog-panel .tray-stack > button strong { grid-column: 2; grid-row: auto; align-self: auto; }
+.catalog-panel .featured-card { min-height: 0; display: grid; grid-template-rows: minmax(160px, 1fr) auto; padding: 16px 0 18px 18px; }
+.catalog-panel .featured-card > img { width: 100%; height: 100%; min-height: 160px; object-fit: contain; background: rgba(0,0,0,.18); }
+.catalog-panel .featured-copy { padding: 12px 4px 0; }
+.catalog-panel .tier-list { min-height: 0; margin: 16px 18px 18px 0; overflow-y: auto; border: 1px solid rgba(210,174,93,.18); border-radius: 12px; background: rgba(0,0,0,.13); }
+.catalog-panel .tier-row { grid-template-columns: 30px 104px minmax(0, 1fr) auto; min-height: 84px; padding: 9px 12px; }
+.catalog-panel .tier-row > img { width: 104px; height: 58px; object-fit: contain; border-radius: 4px; filter: drop-shadow(0 5px 5px rgba(0,0,0,.35)); }
+
+.ticket-artwork { position: absolute; z-index: 0; inset: 0; width: 100%; height: 100%; border-radius: inherit; object-fit: contain; background: rgba(20,12,7,.55); pointer-events: none; }
+.movable-ticket { background-image: none !important; background-color: rgba(30,15,8,.72); }
+.movable-ticket-scratch, .ticket-pin, .ticket-robot { z-index: 3; }
+.movable-ticket.robot-ejected { z-index: 64 !important; pointer-events: none; animation: robot-eject-ticket 1.35s cubic-bezier(.16,.82,.28,1.04) both; }
+.movable-ticket.redeeming { z-index: 66 !important; pointer-events: none; animation: ticket-to-redeem .9s cubic-bezier(.45,.02,.65,.42) forwards; }
+.movable-ticket.discarding { z-index: 66 !important; pointer-events: none; animation: ticket-to-trash .95s cubic-bezier(.35,.02,.7,.45) forwards; }
+@keyframes robot-eject-ticket { 0% { opacity: .15; transform: translate(-50%, -145%) rotate(0) scale(.2); } 55% { opacity: 1; transform: translate(-50%, -72%) rotate(6deg) scale(1.04); } 100% { transform: translate(-50%, -50%) rotate(3deg) scale(1); } }
+@keyframes ticket-to-redeem { 35% { transform: translate(-50%, -70%) rotate(-3deg) scale(.88); } 100% { left: 53%; top: 10%; opacity: 0; transform: translate(-50%, -50%) rotate(0) scale(.12); } }
+@keyframes ticket-to-trash { 35% { transform: translate(-20%, -35%) rotate(11deg) scale(.86); } 100% { left: 94%; top: 92%; opacity: 0; transform: translate(-50%, -50%) rotate(32deg) scale(.15); } }
+.robot-station.ejecting { animation: robot-kick .32s ease-in-out 3; }
+.robot-station.ejecting::after { content: ""; position: absolute; z-index: -1; left: 30%; bottom: 18%; width: 42%; aspect-ratio: 2 / 1; border: 2px solid #d5ae5e; border-radius: 3px; background: url('./assets/concepts/lingqian-ticket-play-v1.webp') center / contain no-repeat; animation: robot-paper-out 1.05s ease-out both; }
+@keyframes robot-kick { 50% { transform: translateY(-3px) rotate(.6deg); } }
+@keyframes robot-paper-out { from { opacity: 0; transform: translateY(-8px) scale(.25); } to { opacity: 1; transform: translateY(70px) scale(.75); } }
+
+.movable-ticket.fan-discarded, .movable-ticket.fan-robot, .movable-ticket.fan-caught, .movable-ticket.fan-safe { animation-duration: 1.75s; }
+.free-desk.tray-drop-ready::before { content: "拖到桌面任意位置放下"; position: absolute; z-index: 67; inset: 19% 19% 22%; display: grid; place-items: center; border: 3px dashed rgba(249,216,134,.75); border-radius: 22px; color: #ffe6a6; background: rgba(7,28,22,.34); font-size: clamp(18px, 2vw, 30px); font-weight: 900; text-shadow: 0 2px 5px #000; pointer-events: none; }
+
+.slot-ticket { position: absolute; inset: 4px; display: block; padding: 0; overflow: hidden; border: 1px solid rgba(221,187,107,.52); border-radius: 5px 5px 12px 12px; background: #171e1b; }
+.slot-ticket > button:first-child { position: absolute; inset: 0; width: 100%; height: 100%; padding: 0; overflow: hidden; background: #101713; }
+.slot-ticket img { width: 100%; height: 100%; object-fit: cover; opacity: .9; }
+.slot-ticket > button:first-child::after { content: ""; position: absolute; top: 0; right: 0; bottom: 0; left: var(--scratch-progress); width: calc(100% - var(--scratch-progress)); background: linear-gradient(115deg, rgba(232,230,220,.62), rgba(148,151,148,.33)); border-left: 1px solid rgba(255,255,255,.5); pointer-events: none; }
+.slot-ticket.visual-complete > button:first-child::after { display: none; }
+.slot-ticket strong, .slot-ticket small { position: absolute; z-index: 2; left: 4px; right: 4px; overflow: hidden; color: #fff4cf; text-shadow: 0 2px 4px #000; text-overflow: ellipsis; white-space: nowrap; }
+.slot-ticket strong { bottom: 17px; font-size: 9px; }
+.slot-ticket small { bottom: 4px; color: #f1d277; font-size: 8px; }
+.slot-ticket > button:last-child { position: absolute; z-index: 4; top: 3px; right: 3px; width: auto; min-height: 19px; padding: 2px 5px; color: #fff1c3; background: rgba(6,27,21,.86); }
+
+.scratch-dialog { width: min(980px, 94vw); max-height: 92vh; overflow: visible; padding: 0; border: 0; border-radius: 16px; background: transparent; box-shadow: 0 40px 120px rgba(0,0,0,.75); }
+.scratch-zoom-artwork { display: block; width: 100%; max-height: 82vh; aspect-ratio: 2 / 1; object-fit: contain; border: 2px solid #d1a657; border-radius: 12px; background: #24150c; box-shadow: inset 0 0 30px #000, 0 20px 60px rgba(0,0,0,.58); }
+.scratch-zoom-layer { position: absolute; inset: 0; display: grid; align-content: center; padding: 10% 7% 4%; border-radius: 12px; background: linear-gradient(90deg, rgba(5,14,11,.08), rgba(5,14,11,.28), rgba(5,14,11,.08)); }
+.scratch-dialog .close-button { top: -17px; right: -17px; }
+.scratch-dialog .scratch-card { gap: 7px; }
+.scratch-dialog .scratch-card .ticket-heading { display: none; }
+.scratch-dialog .scratch-stage { max-height: 42vh; border: 3px solid rgba(245,218,153,.85); border-radius: 8px; box-shadow: 0 8px 28px rgba(0,0,0,.42); }
+.scratch-dialog .scratch-progress { background: rgba(7,25,20,.62); }
+.scratch-dialog .scratch-card > p { display: inline-block; justify-self: center; padding: 5px 11px; border-radius: 99px; color: #fff0c0; background: rgba(5,24,19,.85); }
+.scratch-dialog .result-ticket { max-height: 46vh; overflow: hidden; padding: 11px; border-width: 3px; box-shadow: 0 10px 35px rgba(0,0,0,.5); }
+.scratch-dialog .result-ticket > span { display: none; }
+.scratch-dialog .result-ticket > div { margin-top: 0; }
+.scratch-dialog .result-ticket strong { min-height: clamp(65px, 10vw, 120px); font-size: clamp(28px, 5vw, 58px); }
+.scratch-dialog .result-box { margin-top: 8px; padding: 10px 14px; border-radius: 9px; background: rgba(6,27,21,.92); box-shadow: 0 5px 20px rgba(0,0,0,.35); }
+.scratch-dialog .special-card-rule { justify-self: center; margin: 5px 0; padding: 5px 10px; border-radius: 99px; background: rgba(5,23,18,.9); }
+
+.coin-flight { position: fixed; z-index: 200; inset: 0; pointer-events: none; }
+.coin-flight i { --coin-angle: calc((var(--coin-index) - 4) * 9deg); position: absolute; left: 53%; top: 14%; width: 24px; height: 24px; border: 2px solid #fff0a6; border-radius: 50%; background: radial-gradient(circle at 34% 30%, #fff3a9, #e0a32f 42%, #8d5414 78%); box-shadow: 0 0 16px rgba(255,211,77,.65); animation: coin-to-balance 1.25s cubic-bezier(.28,.08,.5,1) calc(var(--coin-index) * 45ms) both; }
+.coin-flight i::after { content: "¥"; display: grid; place-items: center; height: 100%; color: #6d3d09; font: 900 13px/1 Georgia, serif; }
+@keyframes coin-to-balance { 0% { opacity: 0; transform: translate(0,0) rotate(var(--coin-angle)) scale(.35); } 20% { opacity: 1; transform: translate(calc((var(--coin-index) - 4) * 18px), 45px) rotate(180deg) scale(1); } 100% { opacity: 0; left: 145px; top: 28px; transform: rotate(720deg) scale(.5); } }
+
+.shop-item > strong, .shop-upgrade, .upgrade-confirm button, .max-level-badge { min-height: 48px; }
+.shop-item > strong { grid-column: 1 / -1; width: 100%; }
+.shop-item { grid-template-rows: 1fr 48px; }
+
+@media (max-width: 900px) {
+  .topbar { height: 58px; min-height: 58px; padding-inline: 10px; }
+  .identity { min-width: 0; }
+  .identity small { display: none; }
+  .identity strong { font-size: 14px; }
+  .avatar { width: 39px; height: 39px; }
+  .topbar nav button { min-width: 48px; padding: 0 7px; font-size: 0; }
+  .topbar nav button::before { margin: 0; font-size: 19px; }
+  .desk { height: calc(100dvh - 58px); min-height: 0; background-size: cover; background-position: center; }
+  .catalog-panel { top: 66px; bottom: 8px; width: calc(100vw - 16px); grid-template-columns: 1fr; grid-template-rows: auto auto auto 1fr; overflow-y: auto; }
+  .catalog-panel .panel-title, .catalog-panel .tray-inventory { grid-column: 1; }
+  .catalog-panel .featured-card { padding: 12px; }
+  .catalog-panel .tier-list { margin: 0 12px 16px; overflow: visible; }
+  .catalog-panel .tier-row { grid-template-columns: 25px 76px minmax(0,1fr) auto; }
+  .catalog-panel .tier-row > img { width: 76px; }
+  .catalog-dock { min-width: 0; }
+  .scratch-dialog { width: 96vw; }
+  .scratch-zoom-layer { padding: 7% 4% 3%; }
+  .scratch-dialog .result-box p, .scratch-dialog .special-card-rule { display: none; }
+}

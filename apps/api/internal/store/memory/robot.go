@@ -92,19 +92,13 @@ func (store *Store) TickRobot(_ context.Context, userID uint64, now time.Time, d
 	ticket.ScratchSource = "robot"
 	ticket.ScratchedAt = &now
 	event := &domain.RobotEvent{}
-	if ticket.Reward > 0 {
-		record.user.Balance += ticket.Reward
-		store.balanceRankedAt[userID] = now.UTC()
-		ticket.State = domain.TicketRedeemed
-		ticket.RedeemedAt = &now
-		event.AutoRedeemed = true
-	} else {
-		ticket.Location = domain.TicketOnDesk
-		ticket.DeskX = .78
-		ticket.DeskY = .72
-		ticket.Rotation = 3
-		ticket.ZIndex++
-	}
+	ticket.Location = domain.TicketOnDesk
+	ticket.DeskX = .805
+	ticket.DeskY = .665
+	ticket.Rotation = 3
+	ticket.ZIndex++
+	ticket.SlotIndex = nil
+	ticket.RedeemedAt = nil
 	store.users[userID] = record
 	store.tickets[ticket.ID] = ticket
 	store.robotProcessed[ticket.ID] = true

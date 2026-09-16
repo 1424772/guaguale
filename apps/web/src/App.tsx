@@ -1,4 +1,4 @@
-import { FormEvent, KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerEvent, useEffect, useMemo, useRef, useState } from 'react'
+import { CSSProperties, DragEvent as ReactDragEvent, FormEvent, KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { ApiError, api, type Card, type DailyStatus, type FanCardEvent, type FanStatus, type HistoryEvent, type Leaderboard, type RobotStatus, type ShopItem, type ShopStatus, type Ticket, type User } from './api'
 import { DeskTicket, type DeskPlacement } from './DeskTicket'
 import { HistoryDialog } from './HistoryDialog'
@@ -7,7 +7,7 @@ import { PlateCleaning } from './PlateCleaning'
 import { getSymbolVisual, ScratchCard, symbolClassName, symbolStateClassNames } from './ScratchCard'
 import { ShopDialog } from './ShopDialog'
 import { RobotDialog } from './RobotDialog'
-import ticketArtwork from './assets/concepts/lingqian-ticket-play-v1.webp'
+import { ticketArtworkFor } from './ticketArtwork'
 
 const coinFormatter = new Intl.NumberFormat('zh-CN')
 
@@ -20,6 +20,14 @@ function newIdempotencyKey(prefix: string) {
 
 function updateUnlocks(cards: Card[], balance: number) {
   return cards.map((card) => ({ ...card, unlocked: balance >= card.price }))
+}
+
+function savedScratchProgress() {
+  try {
+    return JSON.parse(window.localStorage.getItem('guaguale:scratch-progress') ?? '{}') as Record<string, number>
+  } catch {
+    return {}
+  }
 }
 
 export function App() {
@@ -57,7 +65,14 @@ export function App() {
   const [dailyBusy, setDailyBusy] = useState(false)
   const [wheelSpinning, setWheelSpinning] = useState(false)
   const [pendingDiscard, setPendingDiscard] = useState<Ticket | null>(null)
+  const [discardingTicketId, setDiscardingTicketId] = useState<string | null>(null)
+  const [redeemingTicketId, setRedeemingTicketId] = useState<string | null>(null)
+  const [robotEjectedTicketId, setRobotEjectedTicketId] = useState<string | null>(null)
+  const [coinBurst, setCoinBurst] = useState<{ key: number; reward: number } | null>(null)
+  const [scratchProgress, setScratchProgress] = useState<Record<string, number>>(savedScratchProgress)
+  const [trayDragging, setTrayDragging] = useState(false)
   const discardTimerRef = useRef<number | null>(null)
+  const discardAnimationTimerRef = useRef<number | null>(null)
   const deskRef = useRef<HTMLDivElement>(null)
   const redeemZoneRef = useRef<HTMLDivElement>(null)
   const trashZoneRef = useRef<HTMLDivElement>(null)
@@ -83,13 +98,13 @@ export function App() {
         setCards((current) => updateUnlocks(current, result.user.balance))
         setRobot(result.robot)
         if (result.event) {
-          if (result.event.autoRedeemed) {
-            setTickets((current) => current.filter((ticket) => ticket.id !== result.event?.ticket.id))
-            setNotice(`机器人刮出中奖卡，已自动兑奖 ${coinFormatter.format(result.event.ticket.reward ?? 0)} 金币`)
-          } else {
-            setTickets((current) => current.map((ticket) => ticket.id === result.event?.ticket.id ? result.event.ticket : ticket))
-            setNotice(`机器人完成《${result.event.ticket.cardName}》，未中奖卡已退回桌面`)
-          }
+          const finished = result.event.ticket
+          setTickets((current) => current.map((ticket) => ticket.id === finished.id ? finished : ticket))
+          setRobotEjectedTicketId(finished.id)
+          window.setTimeout(() => setRobotEjectedTicketId((current) => current === finished.id ? null : current), 1500)
+          setNotice(finished.reward
+            ? `机器人吐出《${finished.cardName}》，中奖 ${coinFormatter.format(finished.reward)} 金币，请手动兑奖`
+            : `机器人吐出《${finished.cardName}》，本张未中奖`)
         }
       } catch (error) {
         if (!stopped) setNotice(messageFrom(error))
@@ -138,8 +153,10 @@ export function App() {
     setBusy(true)
     try {
       if (discardTimerRef.current !== null) window.clearTimeout(discardTimerRef.current)
+      if (discardAnimationTimerRef.current !== null) window.clearTimeout(discardAnimationTimerRef.current)
       if (fanHoldTimerRef.current !== null) window.clearTimeout(fanHoldTimerRef.current)
       discardTimerRef.current = null
+      discardAnimationTimerRef.current = null
       setPendingDiscard(null)
       await api.logout()
       setUser(null)
@@ -218,8 +235,9 @@ export function App() {
       await new Promise((resolve) => window.setTimeout(resolve, 1800))
       setUser(result.user)
       setDaily(result.daily)
-      setTickets((current) => [result.ticket, ...current.filter((ticket) => ticket.id !== result.ticket.id)])
-      setNotice(`转盘获得《${result.ticket.cardName}》，已放入购卡托盘`)
+      const placed = await placeNewTicketOnDesk(result.ticket)
+      setTickets((current) => [placed, ...current.filter((ticket) => ticket.id !== placed.id)])
+      setNotice(`转盘获得《${placed.cardName}》，已放到桌面`)
     } catch (error) {
       setNotice(messageFrom(error))
     } finally {
@@ -236,8 +254,10 @@ export function App() {
       const result = await api.purchase(card.code, newIdempotencyKey('card'))
       setUser(result.user)
       setCards((current) => updateUnlocks(current, result.user.balance))
-      setTickets((current) => [result.ticket, ...current.filter((ticket) => ticket.id !== result.ticket.id)])
-      setNotice('购买成功，卡片已放入购卡托盘')
+      const placed = await placeNewTicketOnDesk(result.ticket)
+      setTickets((current) => [placed, ...current.filter((ticket) => ticket.id !== placed.id)])
+      setCatalogOpen(false)
+      setNotice(`购买成功，《${placed.cardName}》已放到桌面`)
     } catch (error) {
       setNotice(messageFrom(error))
     } finally {
@@ -352,17 +372,57 @@ export function App() {
   async function redeemTicket(ticket: Ticket) {
     if (!ticket.reward || busy) return
     setBusy(true)
+    setActiveTicket(null)
+    setRedeemingTicketId(ticket.id)
     try {
+      await new Promise((resolve) => window.setTimeout(resolve, 900))
       const result = await api.redeem(ticket.id)
       setUser(result.user)
       setCards((current) => updateUnlocks(current, result.user.balance))
       setTickets((current) => current.filter((item) => item.id !== result.ticket.id))
-      if (activeTicket?.id === ticket.id) setActiveTicket(result.ticket)
+      setCoinBurst({ key: Date.now(), reward: result.ticket.reward ?? 0 })
+      window.setTimeout(() => setCoinBurst(null), 1500)
       setNotice(`兑奖成功，获得 ${coinFormatter.format(result.ticket.reward ?? 0)} 金币`)
     } catch (error) {
       setNotice(messageFrom(error))
     } finally {
+      setRedeemingTicketId(null)
       setBusy(false)
+    }
+  }
+
+  function rememberScratchProgress(ticketId: string, progress: number) {
+    setScratchProgress((current) => {
+      const next = { ...current, [ticketId]: progress }
+      try {
+        window.localStorage.setItem('guaguale:scratch-progress', JSON.stringify(next))
+      } catch {
+        // The live UI remains accurate even when storage is unavailable.
+      }
+      return next
+    })
+  }
+
+  function nextDeskPlacement(offset = 0) {
+    const deskCount = tickets.filter((item) => item.location === 'desk').length + offset
+    const column = deskCount % 3
+    const row = Math.floor(deskCount / 3) % 3
+    return {
+      location: 'desk' as const,
+      deskX: .40 + column * .16,
+      deskY: .33 + row * .19,
+      rotation: ((deskCount * 7) % 11) - 5,
+      zIndex: Math.max(1, ...tickets.map((item) => item.zIndex)) + 1 + offset,
+    }
+  }
+
+  async function placeNewTicketOnDesk(ticket: Ticket) {
+    const placement = nextDeskPlacement()
+    try {
+      const result = await api.placeTicket(ticket.id, placement)
+      return result.ticket
+    } catch {
+      return { ...ticket, ...placement }
     }
   }
 
@@ -390,16 +450,18 @@ export function App() {
   }
 
   function sendToDesk(ticket: Ticket) {
-    const deskCount = tickets.filter((item) => item.location === 'desk').length
-    const column = deskCount % 3
-    const row = Math.floor(deskCount / 3) % 3
-    void updateTicketPlacement(ticket, {
-      location: 'desk',
-      deskX: .44 + column * .17,
-      deskY: .36 + row * .2,
-      rotation: ((deskCount * 7) % 11) - 5,
-      zIndex: Math.max(1, ...tickets.map((item) => item.zIndex)) + 1,
-    })
+    void updateTicketPlacement(ticket, nextDeskPlacement())
+  }
+
+  function dragTrayTicketToDesk(ticket: Ticket, event: ReactDragEvent<HTMLButtonElement>) {
+    setTrayDragging(false)
+    const bounds = deskRef.current?.getBoundingClientRect()
+    if (!bounds || event.clientX <= 0 || event.clientY <= 0) return
+    const deskX = Math.max(.08, Math.min(.92, (event.clientX - bounds.left) / bounds.width))
+    const deskY = Math.max(.09, Math.min(.9, (event.clientY - bounds.top) / bounds.height))
+    void updateTicketPlacement(ticket, { ...nextDeskPlacement(), deskX, deskY })
+    setCatalogOpen(false)
+    setNotice(`《${ticket.cardName}》已拖到桌面`)
   }
 
   function removeFromSlot(ticket: Ticket) {
@@ -421,7 +483,7 @@ export function App() {
     const occupied = new Set(tickets.flatMap((item) => item.slotIndex ? [item.slotIndex] : []))
     const firstFree = Array.from({ length: 10 }, (_, index) => index + 1).find((index) => !occupied.has(index))
     if (!firstFree) {
-      setNotice('固定卡槽已经放满10张卡片')
+      setNotice('固定卡槽已经放满10张刮刮乐')
       return
     }
     setActiveTicket(null)
@@ -442,7 +504,7 @@ export function App() {
       return
     }
     if (ticket.state !== 'purchased') {
-      setNotice('机器人只接收还没有刮开的卡片')
+      setNotice('机器人只接收还没有刮开的刮刮乐')
       return
     }
     if (!user?.robotOwned) {
@@ -502,7 +564,7 @@ export function App() {
     }
     if (pointInside(trashZoneRef.current, point)) {
       if (!user?.trashOwned) {
-        setNotice('请先购买垃圾桶，才能丢弃桌面卡片')
+        setNotice('请先购买垃圾桶，才能丢弃桌面刮刮乐')
         void updateTicketPlacement(ticket, { ...placement, location: 'desk' })
         return
       }
@@ -514,11 +576,17 @@ export function App() {
 
   function queueDiscard(ticket: Ticket) {
     if (discardTimerRef.current !== null) window.clearTimeout(discardTimerRef.current)
+    if (discardAnimationTimerRef.current !== null) window.clearTimeout(discardAnimationTimerRef.current)
     if (pendingDiscard) void persistDiscard(pendingDiscard)
-    setTickets((current) => current.filter((item) => item.id !== ticket.id))
-    setPendingDiscard(ticket)
-    setNotice(`《${ticket.cardName}》已放入垃圾桶，5秒内可以撤销`)
-    discardTimerRef.current = window.setTimeout(() => void persistDiscard(ticket), 5000)
+    setDiscardingTicketId(ticket.id)
+    setNotice(`正在丢弃《${ticket.cardName}》…`)
+    discardAnimationTimerRef.current = window.setTimeout(() => {
+      setDiscardingTicketId(null)
+      setTickets((current) => current.filter((item) => item.id !== ticket.id))
+      setPendingDiscard(ticket)
+      setNotice(`《${ticket.cardName}》已放入垃圾桶，5秒内可以撤销`)
+      discardTimerRef.current = window.setTimeout(() => void persistDiscard(ticket), 5000)
+    }, 950)
   }
 
   async function persistDiscard(ticket: Ticket) {
@@ -569,7 +637,7 @@ export function App() {
       return false
     }
     if (deskTickets.length === 0) {
-      setNotice('自由桌面上没有可以吹动的卡片')
+      setNotice('自由桌面上没有可以吹动的刮刮乐')
       return false
     }
     if (!fan.riskAcknowledged && !fanRiskPending) {
@@ -600,7 +668,7 @@ export function App() {
       setFanRiskPending(false)
       const actions = Object.fromEntries(result.event.cards.map((card) => [card.ticket.id, card.action]))
       setFanActions(actions)
-      await new Promise((resolve) => window.setTimeout(resolve, Math.max(420, 960 - result.fan.level * 60)))
+      await new Promise((resolve) => window.setTimeout(resolve, Math.max(1250, 2300 - result.fan.level * 80)))
       const affected = new Map(result.event.cards.map((card) => [card.ticket.id, card]))
       setTickets((current) => current.flatMap((ticket) => {
         const card = affected.get(ticket.id)
@@ -653,25 +721,28 @@ export function App() {
       </header>
 
       {notice && <div className="notice" role="status">{notice}</div>}
+      {coinBurst && <div className="coin-flight" key={coinBurst.key} aria-label={`兑奖获得${coinBurst.reward}金币`}>
+        {Array.from({ length: 9 }, (_, index) => <i key={index} style={{ '--coin-index': index } as CSSProperties} />)}
+      </div>}
 
       <section className="desk">
-        <button type="button" className="catalog-dock" onClick={() => setCatalogOpen(true)} aria-label={`打开购卡托盘，${trayTickets.length}张卡等待放置`}>
+        <button type="button" className="catalog-dock" onClick={() => setCatalogOpen(true)} aria-label={`打开刮刮乐商店，${trayTickets.length}张刮刮乐等待放置`}>
           <span className="catalog-stack" aria-hidden="true"><i /><i /><i /></span>
-          <strong>购卡托盘</strong>
-          <small>{trayTickets.length ? `${trayTickets.length} 张待放置` : '选购刮刮卡'}</small>
+          <strong>刮刮乐商店</strong>
+          <small>{trayTickets.length ? `${trayTickets.length} 张待放置` : '选购刮刮乐'}</small>
         </button>
 
-        {catalogOpen && <button type="button" className="catalog-scrim" onClick={() => setCatalogOpen(false)} aria-label="关闭购卡托盘" />}
+        {catalogOpen && <button type="button" className="catalog-scrim" onClick={() => setCatalogOpen(false)} aria-label="关闭刮刮乐商店" />}
         {catalogOpen && <aside className="catalog-panel">
-          <button type="button" className="catalog-close" onClick={() => setCatalogOpen(false)} aria-label="关闭购卡托盘">×</button>
-          <div className="panel-title"><span>购卡托盘</span><small>余额达到售价即可购买</small></div>
-          <div className="tray-inventory" aria-label="等待放置的卡片">
-            <div className="tray-heading"><strong>待放到桌面</strong><span>{trayTickets.length} 张</span></div>
-            {trayTickets.length === 0 ? <p>新购买和转盘获得的卡会先放在这里。</p> : (
+          <button type="button" className="catalog-close" onClick={() => setCatalogOpen(false)} aria-label="关闭刮刮乐商店">×</button>
+          <div className="panel-title"><span>刮刮乐商店</span><small>选中即买即玩 · 实物票面预览</small></div>
+          <div className="tray-inventory" aria-label="等待放置的刮刮乐">
+            <div className="tray-heading"><strong>临时托盘</strong><span>{trayTickets.length} 张</span></div>
+            {trayTickets.length === 0 ? <p>暂无留存。新购买的刮刮乐会直接放到桌面。</p> : (
               <div className="tray-stack">
                 {trayTickets.slice(0, 8).map((ticket) => (
-                  <button type="button" key={ticket.id} onClick={() => sendToDesk(ticket)} disabled={busy}>
-                    <span>{ticket.cardName}</span><small>{ticket.source === 'daily_wheel' ? '免费卡' : `${ticket.nominalPrice} 金币`}</small><strong>放到桌面 →</strong>
+                  <button type="button" key={ticket.id} draggable onDragStart={() => setTrayDragging(true)} onDragEnd={(event) => dragTrayTicketToDesk(ticket, event)} onClick={() => { sendToDesk(ticket); setCatalogOpen(false) }} disabled={busy}>
+                    <img src={ticketArtworkFor(ticket.cardCode)} alt="" /><span>{ticket.cardName}</span><small>{ticket.source === 'daily_wheel' ? '免费刮刮乐' : `${ticket.nominalPrice} 金币`}</small><strong>拖出或点击放置</strong>
                   </button>
                 ))}
                 {trayTickets.length > 8 && <small>还有 {trayTickets.length - 8} 张等待放置</small>}
@@ -680,7 +751,7 @@ export function App() {
           </div>
           {firstCard && (
             <article className="featured-card">
-              <img src={ticketArtwork} alt="零钱小票卡面概念图" />
+              <img src={ticketArtworkFor(firstCard.code)} alt="零钱小票刮刮乐票面" />
               <div className="featured-copy">
                 <div><span className="tag">已开放</span><h2>{firstCard.name}</h2></div>
                 <p>三格中出现两格相同即可获得对应奖励，三格相同奖励翻倍。</p>
@@ -696,10 +767,11 @@ export function App() {
             </article>
           )}
 
-          <div className="tier-list" aria-label="后续卡片">
+          <div className="tier-list" aria-label="全部刮刮乐">
             {cards.filter((card) => card.code !== 'lingqian-ticket').map((card, index) => (
               <button className="tier-row" key={card.code} type="button" disabled={!card.implemented || !card.unlocked || busy} onClick={() => purchase(card)}>
                 <span className="tier-number">{index + 2}</span>
+                <img src={ticketArtworkFor(card.code)} alt="" />
                 <div><strong>{card.name}</strong><small>{coinFormatter.format(card.price)} 金币门槛</small></div>
                 <span className={card.unlocked ? 'unlocked' : 'locked'}>{!card.implemented ? '待开发' : card.unlocked ? '购买' : '未解锁'}</span>
               </button>
@@ -729,7 +801,7 @@ export function App() {
               {fanHolding && <i>送风中</i>}
             </button>
             <div className="redeem-drop-zone" ref={redeemZoneRef}>
-              <span>兑奖区</span><strong>中奖卡拖到这里</strong><small>未中奖卡不会被兑换</small>
+              <span>兑奖区</span><strong>中奖刮刮乐拖到这里</strong><small>未中奖的不会被兑换</small>
             </div>
             <div className={`trash-drop-zone ${user.trashOwned ? '' : 'locked-zone'}`} ref={trashZoneRef}>
               <span aria-hidden="true">🗑️</span><strong>垃圾桶</strong><small>拖入后可撤销5秒</small>
@@ -744,12 +816,24 @@ export function App() {
             ) : <div className="fixed-slots">
               {Array.from({ length: 10 }, (_, index) => {
                 const slotTicket = slotTickets.find((ticket) => ticket.slotIndex === index + 1)
+                const knownProgress = slotTicket ? scratchProgress[slotTicket.id] : undefined
+                const visuallyComplete = Boolean(slotTicket && slotTicket.state !== 'purchased' && (knownProgress === undefined || knownProgress >= 100))
+                const visualProgress = knownProgress ?? (visuallyComplete ? 100 : 0)
                 return (
                   <div className={`fixed-slot ${slotTicket ? 'occupied' : ''}`} key={index} ref={(element) => { slotRefs.current[index] = element }} data-slot-index={index + 1}>
                     <span>{index + 1}</span>
                     {slotTicket ? (
-                      <div className="slot-ticket">
-                        <button type="button" onClick={() => openTicket(slotTicket)}>{slotTicket.cardName}</button>
+                      <div
+                        className={`slot-ticket card-${slotTicket.cardCode} state-${slotTicket.state} ${visuallyComplete ? 'visual-complete' : visualProgress > 0 ? 'visual-partial' : 'visual-new'}`}
+                        style={{ '--scratch-progress': `${visualProgress}%` } as CSSProperties}
+                      >
+                        <button type="button" onClick={() => openTicket(slotTicket)}>
+                          <img src={ticketArtworkFor(slotTicket.cardCode)} alt={`${slotTicket.cardName}票面`} />
+                          <strong>{slotTicket.cardName}</strong>
+                          <small>{!visuallyComplete
+                            ? (visualProgress > 0 ? `已刮 ${visualProgress}%` : '未开始')
+                            : (slotTicket.reward ? `已刮完 · 中奖${slotTicket.reward}` : '已刮完 · 未中奖')}</small>
+                        </button>
                         <button type="button" onClick={() => removeFromSlot(slotTicket)} aria-label={`取出${slotTicket.cardName}`}>取出</button>
                       </div>
                     ) : <small>拖入保护</small>}
@@ -759,11 +843,11 @@ export function App() {
             </div>}
           </section>
 
-          <div className={`free-desk ${fanHolding ? 'fan-active' : ''}`} ref={deskRef} aria-label="可自由摆放卡片的桌面">
+          <div className={`free-desk ${fanHolding ? 'fan-active' : ''} ${trayDragging ? 'tray-drop-ready' : ''}`} ref={deskRef} aria-label="可自由摆放刮刮乐的桌面">
             <button
               type="button"
               ref={robotZoneRef}
-              className={`robot-station ${user.robotOwned ? 'owned' : 'locked'}`}
+              className={`robot-station ${user.robotOwned ? 'owned' : 'locked'} ${robotEjectedTicketId ? 'ejecting' : ''}`}
               onClick={() => user.robotOwned ? setRobotOpen(true) : void openShop('robot')}
             >
               <span className={robot?.queue.length ? 'working' : ''}>▣</span>
@@ -772,7 +856,7 @@ export function App() {
               {robot?.queue[0] && <i style={{ width: `${Math.max(3, 100 - robot.queue[0].remainingMs / ((robot.durationSeconds || 1) * 10))}%` }} />}
             </button>
             {deskTickets.length === 0 && (
-              <div className="empty-free-desk"><span>✦</span><strong>桌面暂无卡片</strong><small>从左侧购卡托盘把卡片放到桌面</small></div>
+              <div className="empty-free-desk"><span>✦</span><strong>桌面暂无刮刮乐</strong><small>打开商店购买后会直接放到桌面</small></div>
             )}
             {deskTickets.map((ticket) => (
               <DeskTicket
@@ -784,6 +868,7 @@ export function App() {
                 onPin={pinToFirstSlot}
                 onRobot={(ticket) => void enqueueRobot(ticket)}
                 fanAction={fanActions[ticket.id]}
+                motion={ticket.id === robotEjectedTicketId ? 'robot-ejected' : ticket.id === redeemingTicketId ? 'redeeming' : ticket.id === discardingTicketId ? 'discarding' : undefined}
                 onDrop={handleTicketDrop}
               />
             ))}
@@ -802,10 +887,12 @@ export function App() {
         <div className="modal-backdrop" role="presentation" onMouseDown={(event) => {
           if (event.target === event.currentTarget) setActiveTicket(null)
         }}>
-          <section className="scratch-dialog" role="dialog" aria-modal="true" aria-label="刮奖">
+          <section className={`scratch-dialog scratch-dialog-${activeTicket.cardCode}`} role="dialog" aria-modal="true" aria-label="刮奖">
             <button className="close-button" type="button" onClick={() => setActiveTicket(null)} aria-label="关闭">×</button>
+            <img className="scratch-zoom-artwork" src={ticketArtworkFor(activeTicket.cardCode)} alt={`${activeTicket.cardName}刮刮乐票面`} />
+            <div className="scratch-zoom-layer">
             {scratchRequired ? (
-              <ScratchCard cardCode={activeTicket.cardCode} cardName={activeTicket.cardName} symbols={activeTicket.symbols ?? []} scratchLevel={user.scratchLevel} prizeTier={activeTicket.prizeTier} onComplete={() => setScratchComplete(true)} />
+              <ScratchCard cardCode={activeTicket.cardCode} cardName={activeTicket.cardName} symbols={activeTicket.symbols ?? []} scratchLevel={user.scratchLevel} prizeTier={activeTicket.prizeTier} onProgress={(progress) => rememberScratchProgress(activeTicket.id, progress)} onComplete={() => setScratchComplete(true)} />
             ) : (
               <ResultSymbols cardCode={activeTicket.cardCode} cardName={activeTicket.cardName} symbols={activeTicket.symbols ?? []} prizeTier={activeTicket.prizeTier} />
             )}
@@ -817,7 +904,7 @@ export function App() {
                 <h2>{ticketResultTitle(activeTicket)}</h2>
                 <p>{activeTicket.reward ? '把中奖卡放入兑奖区即可入账。' : '未中奖卡将继续留在桌面，后续可丢入垃圾桶。'}</p>
                 {activeTicket.state === 'scratched' && Boolean(activeTicket.reward) && (
-                  <button type="button" className="gold-button" onClick={redeem} disabled={busy}>拖入兑奖区 · 立即兑奖</button>
+                  <button type="button" className="gold-button" onClick={redeem} disabled={busy}>手动兑奖</button>
                 )}
                 {activeTicket.state !== 'redeemed' && activeTicket.location === 'slot' ? (
                   <button type="button" className="secondary-button" onClick={() => { removeFromSlot(activeTicket); setActiveTicket(null) }} disabled={busy}>从固定卡槽取出</button>
@@ -827,6 +914,7 @@ export function App() {
                 {activeTicket.state === 'redeemed' && <span className="redeemed-badge">已经兑奖</span>}
               </div>
             )}
+            </div>
           </section>
         </div>
       )}
@@ -858,7 +946,7 @@ export function App() {
           <section className="fan-risk-dialog" role="dialog" aria-modal="true" aria-label="风扇风险说明">
             <span className="fan-risk-icon" aria-hidden="true">✺</span>
             <h2>启动风扇前请确认</h2>
-            <p>风扇会吹动自由桌面上的所有卡片。已刮完的卡会直接进入垃圾桶；未刮完的卡如果没有被机器人拦截，也可能因吹错而被丢弃。</p>
+            <p>风扇会吹动自由桌面上的所有刮刮乐。已刮完的会直接进入垃圾桶；未刮完的如果没有被机器人拦截，也可能因吹错而被丢弃。</p>
             <p>固定卡槽内的卡完全不受影响。风扇造成的丢弃不会退还金币，也不会补发奖励。</p>
             <div><button type="button" className="secondary-button" onClick={() => setFanRiskOpen(false)}>暂不使用</button><button type="button" className="gold-button" onClick={() => { setFanRiskPending(true); setFanRiskOpen(false); setNotice('风险已确认，请持续按住风扇启动') }}>我已了解</button></div>
           </section>
@@ -1051,7 +1139,7 @@ function DailyTasksDialog({
               <div className="excluded-row"><span>永恒彩钻、放手一博</span><strong>不参与</strong></div>
             </div>
             {daily.wheelUsed ? (
-              <div className="wheel-result"><span>今日结果</span><strong>《{daily.wheelCardName ?? '免费刮奖卡'}》</strong><small>卡片已经放到桌面</small></div>
+              <div className="wheel-result"><span>今日结果</span><strong>《{daily.wheelCardName ?? '免费刮刮乐'}》</strong><small>刮刮乐已经放到桌面</small></div>
             ) : (
               <button className="gold-button wheel-button" type="button" onClick={onSpin} disabled={busy || spinning || wheelUnavailable}>
                 {spinning ? '转盘转动中…' : wheelUnavailable ? '至少持有 50 金币后可转动' : '免费转动 · 今日 1/1'}

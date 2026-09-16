@@ -81,7 +81,7 @@ func TestRegisterRequiresAgeConfirmationAndPurchaseIsIdempotent(t *testing.T) {
 		t.Fatalf("leaderboard leaked private identity: %d %s", leaderboard.Code, leaderboard.Body.String())
 	}
 	history := getJSON(t, handler, "/api/v1/history", cookies[0])
-	if history.Code != http.StatusOK || !bytes.Contains(history.Body.Bytes(), []byte("购买刮刮卡")) {
+	if history.Code != http.StatusOK || !bytes.Contains(history.Body.Bytes(), []byte("购买刮刮乐")) {
 		t.Fatalf("history endpoint did not return purchase event: %d %s", history.Code, history.Body.String())
 	}
 }

@@ -47,7 +47,7 @@ var itemDefinitions = []itemDefinition{
 	{
 		code: TrashItemCode, name: "垃圾桶", category: "safety", defaultLevel: 0,
 		effects: []int{0, 100}, prices: []int64{0, 100}, effectTexts: []string{"未购买", "永久开放"},
-		description: "购买后可以手动丢弃桌面卡片，容量不限。服务端提交前保留5秒撤销。",
+		description: "购买后可以手动丢弃桌面刮刮乐，容量不限。服务端提交前保留5秒撤销。",
 	},
 	{
 		code: CardSlotsItemCode, name: "固定卡槽", category: "safety", defaultLevel: 0,
@@ -80,13 +80,13 @@ var itemDefinitions = []itemDefinition{
 		effects:     []int{0, 3, 5, 8, 12, 18, 30},
 		prices:      []int64{0, 0, 300, 700, 1600, 4000, 10000},
 		effectTexts: []string{"需先购买机器人", "3张", "5张", "8张", "12张", "18张", "30张"},
-		description: "增加机器人可同时等待处理的卡片数量。",
+		description: "增加机器人可同时等待处理的刮刮乐数量。",
 	},
 	{
 		code: RobotInterceptItemCode, name: "机器人拦截", category: "safety", defaultLevel: 1,
 		effects:     []int{0, 45, 55, 64, 72, 80, 87, 94, 100},
 		prices:      []int64{0, 0, 600, 1200, 2500, 5000, 10000, 22000, 45000},
-		description: "决定后续风扇吹动未刮卡时，机器人成功拦截并保护卡片的概率。",
+		description: "决定后续风扇吹动未刮开的刮刮乐时，机器人成功拦截并保护刮刮乐的概率。",
 	},
 }
 

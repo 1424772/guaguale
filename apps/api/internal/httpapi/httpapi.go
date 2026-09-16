@@ -399,7 +399,7 @@ func (api *API) writeError(response http.ResponseWriter, request *http.Request, 
 	case errors.Is(err, store.ErrInsufficientFunds):
 		writeAPIError(response, http.StatusConflict, "insufficient_funds", "金币不足")
 	case errors.Is(err, service.ErrCardUnavailable):
-		writeAPIError(response, http.StatusConflict, "card_unavailable", "该卡片暂未开放")
+		writeAPIError(response, http.StatusConflict, "card_unavailable", "该刮刮乐暂未开放")
 	case errors.Is(err, service.ErrItemUnavailable):
 		writeAPIError(response, http.StatusConflict, "item_unavailable", "该道具已经满级或暂不可升级")
 	case errors.Is(err, store.ErrUpgradeConflict):
@@ -427,9 +427,9 @@ func (api *API) writeError(response http.ResponseWriter, request *http.Request, 
 	case errors.Is(err, store.ErrNotWinner):
 		writeAPIError(response, http.StatusUnprocessableEntity, "not_winner", "该卡未中奖，无法兑奖")
 	case errors.Is(err, store.ErrSlotOccupied):
-		writeAPIError(response, http.StatusConflict, "slot_occupied", "这个固定卡槽已经有卡片")
+		writeAPIError(response, http.StatusConflict, "slot_occupied", "这个固定卡槽已经有刮刮乐")
 	case errors.Is(err, store.ErrProtected):
-		writeAPIError(response, http.StatusConflict, "ticket_protected", "固定卡槽中的卡片不能丢弃")
+		writeAPIError(response, http.StatusConflict, "ticket_protected", "固定卡槽中的刮刮乐不能丢弃")
 	case errors.Is(err, store.ErrDailyLimit):
 		writeAPIError(response, http.StatusConflict, "daily_limit", "今天的次数已经用完")
 	case errors.Is(err, store.ErrTooEarly):

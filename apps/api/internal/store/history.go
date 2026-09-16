@@ -10,7 +10,7 @@ import (
 func BuildGameHistory(tickets []domain.Ticket, automated map[string]bool, limit int) []domain.HistoryEvent {
 	events := make([]domain.HistoryEvent, 0, len(tickets)*3)
 	for _, ticket := range tickets {
-		purchaseTitle := "购买刮刮卡"
+		purchaseTitle := "购买刮刮乐"
 		purchaseDetail := fmt.Sprintf("花费 %d 金币购买《%s》", ticket.PricePaid, ticket.CardName)
 		purchaseDelta := -ticket.PricePaid
 		if ticket.Source == "daily_wheel" {
@@ -27,7 +27,7 @@ func BuildGameHistory(tickets []domain.Ticket, automated map[string]bool, limit 
 		if ticket.ScratchedAt != nil {
 			if isAutomated {
 				title := "机器人自动刮奖"
-				detail := fmt.Sprintf("《%s》未中奖，卡片已返回桌面", ticket.CardName)
+				detail := fmt.Sprintf("《%s》未中奖，刮刮乐已返回桌面", ticket.CardName)
 				delta := int64(0)
 				if ticket.RedeemedAt != nil && ticket.Reward > 0 {
 					title = "机器人自动刮奖并兑奖"
@@ -44,7 +44,7 @@ func BuildGameHistory(tickets []domain.Ticket, automated map[string]bool, limit 
 					detail = fmt.Sprintf("《%s》刮出 %d 金币", ticket.CardName, ticket.Reward)
 				}
 				events = append(events, domain.HistoryEvent{
-					ID: ticket.ID + ":scratch", Type: "scratch", Title: "手动刮开卡片", Detail: detail,
+					ID: ticket.ID + ":scratch", Type: "scratch", Title: "手动刮开刮刮乐", Detail: detail,
 					CardCode: ticket.CardCode, CardName: ticket.CardName, CreatedAt: *ticket.ScratchedAt,
 				})
 			}
@@ -66,7 +66,7 @@ func BuildGameHistory(tickets []domain.Ticket, automated map[string]bool, limit 
 				detail = fmt.Sprintf("《%s》未中奖卡已被清理", ticket.CardName)
 			}
 			events = append(events, domain.HistoryEvent{
-				ID: ticket.ID + ":discard", Type: "discard", Title: "卡片进入垃圾桶", Detail: detail,
+				ID: ticket.ID + ":discard", Type: "discard", Title: "刮刮乐进入垃圾桶", Detail: detail,
 				CardCode: ticket.CardCode, CardName: ticket.CardName, CreatedAt: *ticket.DiscardedAt,
 			})
 		}

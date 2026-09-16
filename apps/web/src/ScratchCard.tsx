@@ -7,6 +7,7 @@ type ScratchCardProps = {
   scratchLevel: number
   prizeTier?: string
   onComplete: () => void
+  onProgress?: (progress: number) => void
 }
 
 type CellBounds = { x: number; y: number; width: number; height: number }
@@ -127,7 +128,7 @@ function getCellBounds(cardCode: string, count: number, columns: number, width: 
   }))
 }
 
-export function ScratchCard({ cardCode, cardName, symbols, scratchLevel, prizeTier = 'none', onComplete }: ScratchCardProps) {
+export function ScratchCard({ cardCode, cardName, symbols, scratchLevel, prizeTier = 'none', onComplete, onProgress }: ScratchCardProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const opaqueIndexesRef = useRef<number[][]>([])
   const revealedRef = useRef<Set<number>>(new Set())
@@ -251,6 +252,7 @@ export function ScratchCard({ cardCode, cardName, symbols, scratchLevel, prizeTi
     if (newlyRevealed.length) setRevealedIndexes([...revealedRef.current].sort((a, b) => a - b))
     const nextProgress = totalSampled ? Math.round((totalTransparent / totalSampled) * 100) : 0
     setProgress(nextProgress)
+    onProgress?.(nextProgress)
     if (nextProgress >= revealThreshold) finish(context, canvas)
   }
 
@@ -260,6 +262,7 @@ export function ScratchCard({ cardCode, cardName, symbols, scratchLevel, prizeTi
     context.clearRect(0, 0, 720, stageHeight)
     setRevealedIndexes(symbols.map((_, index) => index))
     setProgress(100)
+    onProgress?.(100)
     onComplete()
   }
 

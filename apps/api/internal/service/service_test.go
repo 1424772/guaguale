@@ -418,7 +418,7 @@ func TestRobotQueuePausesOfflineAndProcessesInOrder(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if winner.Event == nil || !winner.Event.AutoRedeemed || winner.Event.Ticket.ID != first.Ticket.ID || winner.User.Balance != 100 {
+	if winner.Event == nil || winner.Event.AutoRedeemed || winner.Event.Ticket.ID != first.Ticket.ID || winner.Event.Ticket.State != domain.TicketScratched || winner.Event.Ticket.Location != domain.TicketOnDesk || winner.User.Balance != 0 {
 		t.Fatalf("unexpected winner event: %#v", winner)
 	}
 	var loser RobotTickResult

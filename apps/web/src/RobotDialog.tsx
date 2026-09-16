@@ -24,7 +24,7 @@ export function RobotDialog({ robot, onClose, onOpenShop }: Props) {
           <div className={`robot-machine-large ${active ? 'working' : ''}`}><span>▣</span><i /><i /><i /></div>
           <div>
             <small>{active ? '正在处理' : '当前状态'}</small>
-            <h2>{active?.cardName ?? '等待卡片'}</h2>
+            <h2>{active?.cardName ?? '等待刮刮乐'}</h2>
             <p>{active ? `剩余约 ${seconds(active.remainingMs)} 秒` : '把未刮开的卡拖到机器人处即可入队。'}</p>
             <div className="robot-progress"><span style={{ width: `${progress}%` }} /></div>
           </div>
