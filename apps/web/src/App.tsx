@@ -1,10 +1,10 @@
 import { CSSProperties, DragEvent as ReactDragEvent, FormEvent, KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { ApiError, api, type Card, type DailyStatus, type FanCardEvent, type FanStatus, type HistoryEvent, type Leaderboard, type RobotStatus, type ShopItem, type ShopStatus, type Ticket, type User } from './api'
-import { DeskTicket, type DeskPlacement } from './DeskTicket'
+import { DeskTicket, TicketResultSurface, type DeskPlacement } from './DeskTicket'
 import { HistoryDialog } from './HistoryDialog'
 import { LeaderboardDialog } from './LeaderboardDialog'
 import { PlateCleaning } from './PlateCleaning'
-import { getSymbolVisual, ScratchCard, symbolClassName, symbolStateClassNames } from './ScratchCard'
+import { getSymbolVisual, ScratchCard, symbolClassName, symbolStateClassNames, TicketSymbolGlyph } from './ScratchCard'
 import { ShopDialog } from './ShopDialog'
 import { RobotDialog } from './RobotDialog'
 import { ticketArtworkFor } from './ticketArtwork'
@@ -375,7 +375,7 @@ export function App() {
     setActiveTicket(null)
     setRedeemingTicketId(ticket.id)
     try {
-      await new Promise((resolve) => window.setTimeout(resolve, 900))
+      await new Promise((resolve) => window.setTimeout(resolve, 1050))
       const result = await api.redeem(ticket.id)
       setUser(result.user)
       setCards((current) => updateUnlocks(current, result.user.balance))
@@ -702,6 +702,7 @@ export function App() {
   const trayTickets = tickets.filter((ticket) => ticket.location === 'tray')
   const deskTickets = tickets.filter((ticket) => ticket.location === 'desk')
   const slotTickets = tickets.filter((ticket) => ticket.location === 'slot')
+  const redeemingTicket = redeemingTicketId ? tickets.find((ticket) => ticket.id === redeemingTicketId) : undefined
   const topZ = Math.max(1, ...deskTickets.map((ticket) => ticket.zIndex))
 
   return (
@@ -791,7 +792,7 @@ export function App() {
             <p>未兑奖卡会一直保留</p>
           </div>
 
-          <div className={`desk-zones ${fanHolding ? 'fan-active' : ''}`}>
+          <div className={`desk-zones ${fanHolding ? 'fan-active' : ''} ${redeemingTicket ? 'is-redeeming' : ''}`}>
             <button
               type="button"
               className={`fan-station ${fan?.owned ? 'owned' : 'locked'} ${fanHolding ? 'working' : ''}`}
@@ -806,8 +807,9 @@ export function App() {
               <small>{fan?.owned ? `${fan.forceText} · 吹错${fan.mistakePercent}%` : '购买 · 500金币'}</small>
               {fanHolding && <i>送风中</i>}
             </button>
-            <div className="redeem-drop-zone" ref={redeemZoneRef}>
+            <div className={`redeem-drop-zone ${redeemingTicket ? 'receiving' : ''}`} ref={redeemZoneRef}>
               <span>兑奖区</span><strong>中奖刮刮乐拖到这里</strong><small>未中奖的不会被兑换</small>
+              {redeemingTicket && <img className="redeem-intake-ticket" src={ticketArtworkFor(redeemingTicket.cardCode)} alt="" />}
             </div>
             <div className={`trash-drop-zone ${user.trashOwned ? '' : 'locked-zone'}`} ref={trashZoneRef}>
               <span aria-hidden="true">🗑️</span><strong>垃圾桶</strong><small>拖入后可撤销5秒</small>
@@ -835,6 +837,7 @@ export function App() {
                       >
                         <button type="button" onClick={() => openTicket(slotTicket)}>
                           <img src={ticketArtworkFor(slotTicket.cardCode)} alt={`${slotTicket.cardName}票面`} />
+                          <TicketResultSurface ticket={slotTicket} compact />
                           <strong>{slotTicket.cardName}</strong>
                           <small>{!visuallyComplete
                             ? (visualProgress > 0 ? `已刮 ${visualProgress}%` : '未开始')
@@ -1165,7 +1168,7 @@ function ResultSymbols({ cardCode, cardName, symbols, prizeTier = 'none' }: { ca
       <span>{cardName}</span>
       <div className={`result-symbols count-${symbols.length}`}>{symbols.map((symbol, index) => {
         const visual = getSymbolVisual(symbol)
-        return <strong className={`symbol-${symbolClassName(symbol)} ${symbolStateClassNames(cardCode, symbols, index)}`} aria-label={visual.label} key={`${symbol}-${index}`}>{visual.emoji}<small>{symbol.replace('目标·', '目标：')}</small></strong>
+        return <strong className={`symbol-${symbolClassName(symbol)} ${symbolStateClassNames(cardCode, symbols, index)}`} aria-label={visual.label} key={`${symbol}-${index}`}><TicketSymbolGlyph cardCode={cardCode} symbol={symbol} /><small>{symbol.replace('目标·', '目标：')}</small></strong>
       })}</div>
     </div>
   )

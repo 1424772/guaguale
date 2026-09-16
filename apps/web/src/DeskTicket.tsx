@@ -1,5 +1,6 @@
 import { PointerEvent, RefObject, useEffect, useState } from 'react'
 import type { Ticket } from './api'
+import { getSymbolVisual, symbolClassName, symbolStateClassNames, TicketSymbolGlyph } from './ScratchCard'
 import { ticketArtworkFor } from './ticketArtwork'
 
 export type DeskPlacement = {
@@ -22,6 +23,23 @@ type DeskTicketProps = {
 }
 
 const clamp = (value: number, minimum: number, maximum: number) => Math.max(minimum, Math.min(maximum, value))
+
+export function TicketResultSurface({ ticket, compact = false }: { ticket: Ticket; compact?: boolean }) {
+  const symbols = ticket.symbols ?? []
+  if (ticket.state === 'purchased' || symbols.length === 0) return null
+  return (
+    <div className={`ticket-live-result card-${ticket.cardCode} count-${symbols.length} ${compact ? 'compact' : ''}`} aria-label={`${ticket.cardName}刮开后的图案`}>
+      {symbols.map((symbol, index) => {
+        const visual = getSymbolVisual(symbol)
+        return (
+          <span className={`ticket-live-symbol symbol-${symbolClassName(symbol)} ${symbolStateClassNames(ticket.cardCode, symbols, index)}`} title={visual.label} key={`${symbol}-${index}`}>
+            <TicketSymbolGlyph cardCode={ticket.cardCode} symbol={symbol} />
+          </span>
+        )
+      })}
+    </div>
+  )
+}
 
 export function DeskTicket({ ticket, deskRef, topZ, onOpen, onPin, onRobot, fanAction, motion, onDrop }: DeskTicketProps) {
   const [placement, setPlacement] = useState<DeskPlacement>({
@@ -101,6 +119,7 @@ export function DeskTicket({ ticket, deskRef, topZ, onOpen, onPin, onRobot, fanA
       onPointerCancel={() => setDrag(null)}
     >
       <img className="ticket-artwork" src={ticketArtworkFor(ticket.cardCode)} alt="" draggable={false} />
+      <TicketResultSurface ticket={ticket} />
       <span className="movable-ticket-name">{ticket.cardName}</span>
       <div className="movable-ticket-scratch">
         {ticket.state === 'purchased' ? <span>刮奖区</span> : <span>{ticket.reward ? `中奖 ${ticket.reward}` : '未中奖'}</span>}

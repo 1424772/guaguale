@@ -1,4 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
+import lingqianBanknote from './assets/symbols/lingqian-banknote.png'
+import lingqianCashStack from './assets/symbols/lingqian-cash-stack.png'
+import lingqianDiamond from './assets/symbols/lingqian-diamond.png'
+import lingqianDogCoin from './assets/symbols/lingqian-dog-coin.png'
 
 type ScratchCardProps = {
   cardCode: string
@@ -58,12 +62,28 @@ const symbolVisuals: Record<string, { emoji: string; label: string }> = {
 
 const diamondAppraisals = ['重量', '切工', '净度', '火彩', '稀有度']
 
+const lingqianArtworkBySymbol: Record<string, string> = {
+  '狗头金币': lingqianDogCoin,
+  '钞票': lingqianBanknote,
+  '碎钻石': lingqianDiamond,
+  '钞票堆': lingqianCashStack,
+}
+
 export function getSymbolVisual(symbol: string) {
   const baseSymbol = symbol.replace(/^目标·/, '')
   const fuelValue = symbol.match(/^燃料 (\d)$/)?.[1]
   return fuelValue
     ? { emoji: `⛽${fuelValue}`, label: symbol }
     : symbolVisuals[baseSymbol] ?? { emoji: '✦', label: symbol }
+}
+
+export function TicketSymbolGlyph({ cardCode, symbol }: { cardCode: string; symbol: string }) {
+  const baseSymbol = symbol.replace(/^目标·/, '')
+  const artwork = cardCode === 'lingqian-ticket' ? lingqianArtworkBySymbol[baseSymbol] : undefined
+  if (artwork) {
+    return <span className="ticket-symbol-glyph ticket-symbol-glyph-artwork" style={{ backgroundImage: `url(${artwork})` }} aria-hidden="true" />
+  }
+  return <span className="ticket-symbol-glyph" aria-hidden="true">{getSymbolVisual(symbol).emoji}</span>
 }
 
 export function symbolClassName(symbol: string) {
@@ -343,7 +363,7 @@ export function ScratchCard({ cardCode, cardName, symbols, scratchLevel, prizeTi
                 aria-label={visual.label}
                 style={{ position: 'absolute', left: `${cell.x / 7.2}%`, top: `${cell.y / stageHeight * 100}%`, width: `${cell.width / 7.2}%`, height: `${cell.height / stageHeight * 100}%` }}
               >
-                <span>{visual.emoji}</span>
+                <TicketSymbolGlyph cardCode={cardCode} symbol={symbol} />
                 <small>{symbol.startsWith('目标·') ? `目标：${visual.label}` : visual.label}</small>
               </div>
             )
