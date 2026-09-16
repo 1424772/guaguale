@@ -1,8 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import lingqianBanknote from './assets/symbols/lingqian-banknote.png'
-import lingqianCashStack from './assets/symbols/lingqian-cash-stack.png'
-import lingqianDiamond from './assets/symbols/lingqian-diamond.png'
-import lingqianDogCoin from './assets/symbols/lingqian-dog-coin.png'
+import { symbolArtworkFor } from './symbolArtwork'
 
 type ScratchCardProps = {
   cardCode: string
@@ -62,13 +59,6 @@ const symbolVisuals: Record<string, { emoji: string; label: string }> = {
 
 const diamondAppraisals = ['重量', '切工', '净度', '火彩', '稀有度']
 
-const lingqianArtworkBySymbol: Record<string, string> = {
-  '狗头金币': lingqianDogCoin,
-  '钞票': lingqianBanknote,
-  '碎钻石': lingqianDiamond,
-  '钞票堆': lingqianCashStack,
-}
-
 export function getSymbolVisual(symbol: string) {
   const baseSymbol = symbol.replace(/^目标·/, '')
   const fuelValue = symbol.match(/^燃料 (\d)$/)?.[1]
@@ -79,10 +69,12 @@ export function getSymbolVisual(symbol: string) {
 
 export function TicketSymbolGlyph({ cardCode, symbol }: { cardCode: string; symbol: string }) {
   const baseSymbol = symbol.replace(/^目标·/, '')
-  const artwork = cardCode === 'lingqian-ticket' ? lingqianArtworkBySymbol[baseSymbol] : undefined
+  const artwork = symbolArtworkFor(cardCode, baseSymbol)
   if (artwork) {
-    return <span className="ticket-symbol-glyph ticket-symbol-glyph-artwork" style={{ backgroundImage: `url(${artwork})` }} aria-hidden="true" />
+    return <span className={`ticket-symbol-glyph ticket-symbol-glyph-artwork art-card-${cardCode}`} style={{ backgroundImage: `url(${artwork})` }} aria-hidden="true" />
   }
+  const fuelValue = symbol.match(/^燃料 (\d)$/)?.[1]
+  if (fuelValue) return <span className={`ticket-symbol-glyph ticket-fuel-glyph fuel-${fuelValue}`} aria-hidden="true"><b>⚡</b><em>{fuelValue}</em></span>
   return <span className="ticket-symbol-glyph" aria-hidden="true">{getSymbolVisual(symbol).emoji}</span>
 }
 
@@ -159,7 +151,7 @@ function getCellBounds(cardCode: string, count: number, columns: number, width: 
     const cellWidth = (width - margin * 2 - gap * 4) / 5
     return Array.from({ length: count }, (_, index) => ({ x: margin + index * (cellWidth + gap), y: 18, width: cellWidth, height: height - 36 }))
   }
-  if (cardCode === 'all-in') return [{ x: width / 2 - 105, y: height / 2 - 105, width: 210, height: 210 }]
+  if (cardCode === 'all-in') return [{ x: 18, y: 18, width: width - 36, height: height - 36 }]
   const rows = Math.ceil(count / columns)
   const cellWidth = width / columns
   const cellHeight = height / rows
@@ -183,7 +175,7 @@ export function ScratchCard({ cardCode, cardName, symbols, scratchLevel, prizeTi
   const [revealedIndexes, setRevealedIndexes] = useState<number[]>([])
   const columns = cardCode === 'eternal-color-diamond' ? 5 : symbols.length === 9 ? 3 : symbols.length > 4 ? 4 : Math.max(symbols.length, 1)
   const rows = Math.ceil(symbols.length / columns)
-  const stageHeight = cardCode === 'eternal-color-diamond' ? 190 : cardCode === 'all-in' ? 270 : rows <= 1 ? 220 : rows * 145
+  const stageHeight = cardCode === 'eternal-color-diamond' ? 190 : cardCode === 'all-in' ? 720 : rows <= 1 ? 220 : rows * 145
   const revealThreshold = cardCode === 'all-in' ? 70 : 65
   const rangePercent = scratchEffects[Math.max(1, Math.min(10, scratchLevel))]
   const brushRadius = Math.max(6, stageHeight * rangePercent / 200)
@@ -228,7 +220,7 @@ export function ScratchCard({ cardCode, cardName, symbols, scratchLevel, prizeTi
       })
     } else if (cardCode === 'all-in') {
       context.beginPath()
-      context.arc(width / 2, height / 2, 105, 0, Math.PI * 2)
+      context.arc(width / 2, height / 2, Math.min(width, height) / 2 - 18, 0, Math.PI * 2)
       context.fill()
     } else if (cardCode === 'street-store' || cardCode === 'arcade-challenge' || cardCode === 'gold-mine' || cardCode === 'rocket-launch') {
       const coatingCells = getCellBounds(cardCode, symbols.length, columns, width, height)
