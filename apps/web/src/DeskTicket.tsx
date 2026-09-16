@@ -14,12 +14,13 @@ type DeskTicketProps = {
   topZ: number
   onOpen: (ticket: Ticket) => void
   onPin: (ticket: Ticket) => void
+  onRobot: (ticket: Ticket) => void
   onDrop: (ticket: Ticket, point: { x: number; y: number }, placement: DeskPlacement) => void
 }
 
 const clamp = (value: number, minimum: number, maximum: number) => Math.max(minimum, Math.min(maximum, value))
 
-export function DeskTicket({ ticket, deskRef, topZ, onOpen, onPin, onDrop }: DeskTicketProps) {
+export function DeskTicket({ ticket, deskRef, topZ, onOpen, onPin, onRobot, onDrop }: DeskTicketProps) {
   const [placement, setPlacement] = useState<DeskPlacement>({
     deskX: ticket.deskX,
     deskY: ticket.deskY,
@@ -111,6 +112,16 @@ export function DeskTicket({ ticket, deskRef, topZ, onOpen, onPin, onDrop }: Des
           onPin(ticket)
         }}
       >固定</button>
+      {ticket.state === 'purchased' && <button
+        type="button"
+        className="ticket-robot"
+        aria-label={`将${ticket.cardName}交给机器人`}
+        onPointerDown={(event) => event.stopPropagation()}
+        onClick={(event) => {
+          event.stopPropagation()
+          onRobot(ticket)
+        }}
+      >机器人</button>}
       <i className="drag-grip" aria-hidden="true">⠿</i>
     </article>
   )

@@ -1,9 +1,10 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react'
-import { ApiError, api, type Card, type DailyStatus, type ShopItem, type ShopStatus, type Ticket, type User } from './api'
+import { ApiError, api, type Card, type DailyStatus, type RobotStatus, type ShopItem, type ShopStatus, type Ticket, type User } from './api'
 import { DeskTicket, type DeskPlacement } from './DeskTicket'
 import { PlateCleaning } from './PlateCleaning'
 import { ScratchCard } from './ScratchCard'
 import { ShopDialog } from './ShopDialog'
+import { RobotDialog } from './RobotDialog'
 import ticketArtwork from './assets/concepts/lingqian-ticket-play-v1.webp'
 
 const coinFormatter = new Intl.NumberFormat('zh-CN')
@@ -27,6 +28,8 @@ export function App() {
   const [shopOpen, setShopOpen] = useState(false)
   const [shopFocus, setShopFocus] = useState<ShopItem['code']>('luck')
   const [shop, setShop] = useState<ShopStatus | null>(null)
+  const [robot, setRobot] = useState<RobotStatus | null>(null)
+  const [robotOpen, setRobotOpen] = useState(false)
   const [dailyBusy, setDailyBusy] = useState(false)
   const [wheelSpinning, setWheelSpinning] = useState(false)
   const [pendingDiscard, setPendingDiscard] = useState<Ticket | null>(null)
@@ -34,11 +37,48 @@ export function App() {
   const deskRef = useRef<HTMLDivElement>(null)
   const redeemZoneRef = useRef<HTMLDivElement>(null)
   const trashZoneRef = useRef<HTMLDivElement>(null)
+  const robotZoneRef = useRef<HTMLButtonElement>(null)
   const slotRefs = useRef<Array<HTMLDivElement | null>>([])
+  const robotTickingRef = useRef(false)
 
   useEffect(() => {
     void bootstrap()
   }, [])
+
+  useEffect(() => {
+    if (!robot?.owned || robot.queue.length === 0) return
+    let stopped = false
+    async function tick() {
+      if (stopped || document.hidden || robotTickingRef.current) return
+      robotTickingRef.current = true
+      try {
+        const result = await api.tickRobot()
+        if (stopped) return
+        setUser(result.user)
+        setCards((current) => updateUnlocks(current, result.user.balance))
+        setRobot(result.robot)
+        if (result.event) {
+          if (result.event.autoRedeemed) {
+            setTickets((current) => current.filter((ticket) => ticket.id !== result.event?.ticket.id))
+            setNotice(`机器人刮出中奖卡，已自动兑奖 ${coinFormatter.format(result.event.ticket.reward ?? 0)} 金币`)
+          } else {
+            setTickets((current) => current.map((ticket) => ticket.id === result.event?.ticket.id ? result.event.ticket : ticket))
+            setNotice(`机器人完成《${result.event.ticket.cardName}》，未中奖卡已退回桌面`)
+          }
+        }
+      } catch (error) {
+        if (!stopped) setNotice(messageFrom(error))
+      } finally {
+        robotTickingRef.current = false
+      }
+    }
+    void tick()
+    const timer = window.setInterval(() => void tick(), 1000)
+    return () => {
+      stopped = true
+      window.clearInterval(timer)
+    }
+  }, [robot?.owned, robot?.queue.length])
 
   async function bootstrap() {
     try {
@@ -55,10 +95,11 @@ export function App() {
   }
 
   async function loadGameData() {
-    const [cardResponse, ticketResponse, dailyResponse] = await Promise.all([api.cards(), api.tickets(), api.daily()])
+    const [cardResponse, ticketResponse, dailyResponse, robotResponse] = await Promise.all([api.cards(), api.tickets(), api.daily(), api.robot()])
     setCards(cardResponse.cards)
     setTickets(ticketResponse.tickets)
     setDaily(dailyResponse.daily)
+    setRobot(robotResponse.robot)
   }
 
   async function handleAuthenticated(nextUser: User) {
@@ -79,6 +120,8 @@ export function App() {
       setTickets([])
       setDaily(null)
       setShop(null)
+      setRobot(null)
+      setRobotOpen(false)
       setShopOpen(false)
       setActiveTicket(null)
     } catch (error) {
@@ -195,6 +238,10 @@ export function App() {
       setUser(result.user)
       setCards((current) => updateUnlocks(current, result.user.balance))
       setShop(result.shop)
+      if (item.code.startsWith('robot')) {
+        const robotResponse = await api.robot()
+        setRobot(robotResponse.robot)
+      }
       const updated = result.shop.items.find((candidate) => candidate.code === result.itemCode)
       setNotice(item.maxLevel === 1 ? `${updated?.name ?? item.name}购买成功，已永久开放` : `${updated?.name ?? item.name}已升级到 ${updated?.level ?? item.level + 1} 级`)
     } catch (error) {
@@ -327,6 +374,36 @@ export function App() {
     setNotice(`《${ticket.cardName}》已放入固定卡槽 ${firstFree}`)
   }
 
+  async function enqueueRobot(ticket: Ticket) {
+    if (ticket.cardCode === 'all-in') {
+      setNotice('《放手一博》只能手动刮奖')
+      return
+    }
+    if (ticket.state !== 'purchased') {
+      setNotice('机器人只接收还没有刮开的卡片')
+      return
+    }
+    if (!user?.robotOwned) {
+      setNotice('请先购买自动刮奖机器人')
+      void openShop('robot')
+      return
+    }
+    if (robot && robot.queue.length >= robot.capacity) {
+      setNotice('机器人队列已经放满')
+      setRobotOpen(true)
+      return
+    }
+    try {
+      const result = await api.enqueueRobot(ticket.id)
+      setRobot(result.robot)
+      setTickets((current) => current.map((item) => item.id === ticket.id ? result.ticket : item))
+      setActiveTicket(null)
+      setNotice(`《${ticket.cardName}》已加入机器人队列`)
+    } catch (error) {
+      setNotice(messageFrom(error))
+    }
+  }
+
   function pointInside(element: HTMLElement | null, point: { x: number; y: number }) {
     if (!element) return false
     const bounds = element.getBoundingClientRect()
@@ -355,6 +432,10 @@ export function App() {
       } else {
         void redeemTicket(ticket)
       }
+      return
+    }
+    if (pointInside(robotZoneRef.current, point)) {
+      void enqueueRobot(ticket)
       return
     }
     if (pointInside(trashZoneRef.current, point)) {
@@ -514,6 +595,17 @@ export function App() {
           </section>
 
           <div className="free-desk" ref={deskRef} aria-label="可自由摆放卡片的桌面">
+            <button
+              type="button"
+              ref={robotZoneRef}
+              className={`robot-station ${user.robotOwned ? 'owned' : 'locked'}`}
+              onClick={() => user.robotOwned ? setRobotOpen(true) : void openShop('robot')}
+            >
+              <span className={robot?.queue.length ? 'working' : ''}>▣</span>
+              <strong>{user.robotOwned ? '自动刮奖机器人' : '机器人维修箱'}</strong>
+              <small>{user.robotOwned ? `${robot?.queue.length ?? 0} / ${robot?.capacity ?? 3} 张` : '购买 · 1,000金币'}</small>
+              {robot?.queue[0] && <i style={{ width: `${Math.max(3, 100 - robot.queue[0].remainingMs / ((robot.durationSeconds || 1) * 10))}%` }} />}
+            </button>
             {deskTickets.length === 0 && (
               <div className="empty-free-desk"><span>✦</span><strong>桌面暂无卡片</strong><small>从左侧购卡托盘把卡片放到桌面</small></div>
             )}
@@ -525,6 +617,7 @@ export function App() {
                 topZ={topZ}
                 onOpen={openTicket}
                 onPin={pinToFirstSlot}
+                onRobot={(ticket) => void enqueueRobot(ticket)}
                 onDrop={handleTicketDrop}
               />
             ))}
@@ -586,6 +679,10 @@ export function App() {
 
       {shopOpen && shop && user && (
         <ShopDialog user={user} shop={shop} busy={busy} initialItemCode={shopFocus} onClose={() => setShopOpen(false)} onUpgrade={upgradeItem} />
+      )}
+
+      {robotOpen && robot?.owned && (
+        <RobotDialog robot={robot} onClose={() => setRobotOpen(false)} onOpenShop={(code) => { setRobotOpen(false); void openShop(code) }} />
       )}
     </main>
   )

@@ -22,6 +22,10 @@ var (
 	ErrUpgradeConflict   = errors.New("item level changed")
 	ErrTrashRequired     = errors.New("trash item is required")
 	ErrCardSlotsRequired = errors.New("card slots item is required")
+	ErrRobotRequired     = errors.New("robot item is required")
+	ErrRobotQueueFull    = errors.New("robot queue is full")
+	ErrRobotManaged      = errors.New("ticket is managed by robot")
+	ErrRobotUnsupported  = errors.New("ticket does not support robot")
 )
 
 type CreateTicketInput struct {
@@ -65,6 +69,14 @@ type UpgradeItemInput struct {
 	IdempotencyKey    string
 }
 
+type EnqueueRobotInput struct {
+	UserID     uint64
+	TicketID   string
+	DurationMS int64
+	Capacity   int
+	EnqueuedAt time.Time
+}
+
 type Store interface {
 	Ping(context.Context) error
 	CreateUser(context.Context, string, string, int64) (domain.User, error)
@@ -79,6 +91,9 @@ type Store interface {
 	UpdateTicketPlacement(context.Context, uint64, string, TicketPlacement) (domain.Ticket, error)
 	DiscardTicket(context.Context, uint64, string, time.Time) (domain.Ticket, error)
 	UpgradeItem(context.Context, UpgradeItemInput) (domain.User, domain.ItemUpgrade, bool, error)
+	ListRobotQueue(context.Context, uint64) ([]domain.RobotQueueItem, error)
+	EnqueueRobot(context.Context, EnqueueRobotInput) (domain.Ticket, []domain.RobotQueueItem, error)
+	TickRobot(context.Context, uint64, time.Time, int64) (domain.User, *domain.RobotEvent, []domain.RobotQueueItem, error)
 	DailyStatus(context.Context, uint64, string) (domain.DailyStatus, error)
 	ClaimDailyLogin(context.Context, uint64, string, int64) (domain.User, domain.DailyStatus, bool, error)
 	StartPlate(context.Context, uint64, string, domain.PlateAction) (domain.DailyStatus, bool, error)

@@ -6,11 +6,15 @@ export type User = {
   scratchLevel: number
   trashOwned: boolean
   cardSlotsOwned: boolean
+  robotOwned: boolean
+  robotSpeedLevel: number
+  robotQueueLevel: number
+  robotInterceptLevel: number
   createdAt: string
 }
 
 export type ShopItem = {
-  code: 'luck' | 'scratch-range' | 'trash' | 'card-slots'
+  code: 'luck' | 'scratch-range' | 'trash' | 'card-slots' | 'robot' | 'robot-speed' | 'robot-queue' | 'robot-intercept'
   name: string
   category: 'luck' | 'efficiency' | 'safety'
   level: number
@@ -24,6 +28,8 @@ export type ShopItem = {
   description: string
   notice?: string
   relockedCards: string[]
+  locked: boolean
+  lockedReason?: string
 }
 
 export type LuckTierImpact = {
@@ -68,7 +74,7 @@ export type Ticket = {
   reward?: number
   symbols?: string[]
   state: TicketState
-  location: 'tray' | 'desk' | 'slot'
+  location: 'tray' | 'desk' | 'slot' | 'robot'
   deskX: number
   deskY: number
   rotation: number
@@ -108,6 +114,30 @@ export type DailyStatus = {
   wheelCardCode?: string
   wheelCardName?: string
   wheelPool: WheelPoolItem[]
+}
+
+export type RobotQueueItem = {
+  ticketId: string
+  cardCode: string
+  cardName: string
+  remainingMs: number
+  position: number
+}
+
+export type RobotStatus = {
+  owned: boolean
+  speedLevel: number
+  queueLevel: number
+  interceptLevel: number
+  durationSeconds: number
+  capacity: number
+  interceptPercent: number
+  queue: RobotQueueItem[]
+}
+
+export type RobotEvent = {
+  ticket: Ticket
+  autoRedeemed: boolean
 }
 
 type ApiErrorBody = {
@@ -225,6 +255,13 @@ export const api = {
     body: JSON.stringify(placement),
   }),
   discardTicket: (ticketId: string) => request<{ ticket: Ticket }>(`/api/v1/tickets/${ticketId}/discard`, {
+    method: 'POST',
+  }),
+  robot: () => request<{ robot: RobotStatus }>('/api/v1/robot'),
+  enqueueRobot: (ticketId: string) => request<{ ticket: Ticket; robot: RobotStatus }>(`/api/v1/robot/tickets/${ticketId}`, {
+    method: 'POST',
+  }),
+  tickRobot: () => request<{ user: User; robot: RobotStatus; event?: RobotEvent }>('/api/v1/robot/tick', {
     method: 'POST',
   }),
 }

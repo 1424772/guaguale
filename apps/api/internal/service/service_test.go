@@ -247,7 +247,7 @@ func TestPermanentItemUpgrades(t *testing.T) {
 		t.Fatalf("unexpected default item levels: %#v", authResult.User)
 	}
 	shop := service.Shop(authResult.User)
-	if len(shop.Items) != 4 || shop.Items[0].NextPrice != 300 || shop.Items[1].NextPrice != 100 || shop.Items[2].NextPrice != 100 || shop.Items[3].NextPrice != 500 {
+	if len(shop.Items) != 8 || shop.Items[0].NextPrice != 300 || shop.Items[1].NextPrice != 100 || shop.Items[2].NextPrice != 100 || shop.Items[3].NextPrice != 500 || shop.Items[4].NextPrice != 1000 {
 		t.Fatalf("unexpected initial shop: %#v", shop)
 	}
 
@@ -293,5 +293,92 @@ func TestPermanentItemUpgrades(t *testing.T) {
 	slots, err := service.UpgradeItem(ctx, trash.User, "card-slots", "upgrade-slots-001")
 	if err != nil || !slots.User.CardSlotsOwned || slots.User.Balance != 50 {
 		t.Fatalf("unexpected card slots purchase: %#v, %v", slots, err)
+	}
+}
+
+func TestRobotQueuePausesOfflineAndProcessesInOrder(t *testing.T) {
+	ctx := context.Background()
+	service := New(memory.New())
+	clock := time.Date(2026, 9, 16, 2, 0, 0, 0, time.UTC)
+	service.now = func() time.Time { return clock }
+	user, err := service.Register(ctx, "机器人玩家", "correct-horse-42", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	daily, err := service.ClaimDailyLogin(ctx, user.User.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	robot, err := service.UpgradeItem(ctx, daily.User, "robot", "buy-robot-001")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !robot.User.RobotOwned || robot.User.RobotSpeedLevel != 1 || robot.User.RobotQueueLevel != 1 || robot.User.RobotInterceptLevel != 1 || robot.User.Balance != 100 {
+		t.Fatalf("unexpected robot purchase: %#v", robot.User)
+	}
+	robotShop := service.Shop(robot.User)
+	if robotShop.Items[5].Locked || robotShop.Items[5].Level != 1 || robotShop.Items[5].NextPrice != 500 || robotShop.Items[6].NextPrice != 300 || robotShop.Items[7].NextPrice != 600 {
+		t.Fatalf("unexpected unlocked robot modules: %#v", robotShop.Items[5:])
+	}
+	draws := 0
+	service.drawCard = func(string, uint8) (domain.Outcome, error) {
+		draws++
+		if draws == 1 {
+			return domain.Outcome{PrizeTier: "first", Reward: 100, Symbols: []string{"碎钻石", "钞票", "碎钻石"}}, nil
+		}
+		return domain.Outcome{PrizeTier: "none", Symbols: []string{"狗头金币", "钞票", "碎钻石"}}, nil
+	}
+	first, err := service.Purchase(ctx, robot.User, "lingqian-ticket", "robot-card-001")
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := service.Purchase(ctx, first.User, "lingqian-ticket", "robot-card-002")
+	if err != nil {
+		t.Fatal(err)
+	}
+	queued, err := service.EnqueueRobot(ctx, second.User, first.Ticket.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	queued, err = service.EnqueueRobot(ctx, second.User, second.Ticket.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(queued.Robot.Queue) != 2 || queued.Robot.Capacity != 3 || queued.Robot.DurationSeconds != 40 {
+		t.Fatalf("unexpected robot queue: %#v", queued.Robot)
+	}
+	initial, err := service.TickRobot(ctx, second.User)
+	if err != nil {
+		t.Fatal(err)
+	}
+	clock = clock.Add(time.Minute)
+	paused, err := service.TickRobot(ctx, second.User)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if paused.Robot.Queue[0].RemainingMS != initial.Robot.Queue[0].RemainingMS {
+		t.Fatalf("offline time advanced robot: before=%d after=%d", initial.Robot.Queue[0].RemainingMS, paused.Robot.Queue[0].RemainingMS)
+	}
+	var winner RobotTickResult
+	for index := 0; index < 20; index++ {
+		clock = clock.Add(2 * time.Second)
+		winner, err = service.TickRobot(ctx, second.User)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	if winner.Event == nil || !winner.Event.AutoRedeemed || winner.Event.Ticket.ID != first.Ticket.ID || winner.User.Balance != 100 {
+		t.Fatalf("unexpected winner event: %#v", winner)
+	}
+	var loser RobotTickResult
+	for index := 0; index < 20; index++ {
+		clock = clock.Add(2 * time.Second)
+		loser, err = service.TickRobot(ctx, winner.User)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	if loser.Event == nil || loser.Event.AutoRedeemed || loser.Event.Ticket.ID != second.Ticket.ID || loser.Event.Ticket.State != domain.TicketScratched || loser.Event.Ticket.Location != domain.TicketOnDesk || len(loser.Robot.Queue) != 0 {
+		t.Fatalf("unexpected loser event: %#v", loser)
 	}
 }

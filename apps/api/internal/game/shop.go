@@ -7,10 +7,14 @@ import (
 )
 
 const (
-	LuckItemCode         = "luck"
-	ScratchRangeItemCode = "scratch-range"
-	TrashItemCode        = "trash"
-	CardSlotsItemCode    = "card-slots"
+	LuckItemCode           = "luck"
+	ScratchRangeItemCode   = "scratch-range"
+	TrashItemCode          = "trash"
+	CardSlotsItemCode      = "card-slots"
+	RobotItemCode          = "robot"
+	RobotSpeedItemCode     = "robot-speed"
+	RobotQueueItemCode     = "robot-queue"
+	RobotInterceptItemCode = "robot-intercept"
 )
 
 type itemDefinition struct {
@@ -49,22 +53,60 @@ var itemDefinitions = []itemDefinition{
 		effects: []int{0, 100}, prices: []int64{0, 500}, effectTexts: []string{"未购买", "10个固定卡位"},
 		description: "购买后永久开放10个卡位，固定的卡不会被丢弃或参与后续风扇清理。",
 	},
+	{
+		code: RobotItemCode, name: "自动刮奖机器人", category: "efficiency", defaultLevel: 0,
+		effects: []int{0, 100}, prices: []int64{0, 1000}, effectTexts: []string{"未购买", "速度1 · 队列3 · 拦截45%"},
+		description: "购买后可把未刮开的卡交给机器人依次处理；中奖自动兑奖，未中奖退回桌面。",
+		notice:      "关闭或切到后台时暂停，不补算离线进度；《放手一博》只能手动刮。",
+	},
+	{
+		code: RobotSpeedItemCode, name: "机器人速度", category: "efficiency", defaultLevel: 1,
+		effects:     []int{0, 40, 32, 25, 19, 14, 10, 7, 5},
+		prices:      []int64{0, 0, 500, 1000, 2200, 4500, 9000, 18000, 36000},
+		effectTexts: []string{"需先购买机器人", "40秒/张", "32秒/张", "25秒/张", "19秒/张", "14秒/张", "10秒/张", "7秒/张", "5秒/张"},
+		description: "缩短机器人处理每张卡所需的前台运行时间。",
+	},
+	{
+		code: RobotQueueItemCode, name: "机器人队列", category: "efficiency", defaultLevel: 1,
+		effects:     []int{0, 3, 5, 8, 12, 18, 30},
+		prices:      []int64{0, 0, 300, 700, 1600, 4000, 10000},
+		effectTexts: []string{"需先购买机器人", "3张", "5张", "8张", "12张", "18张", "30张"},
+		description: "增加机器人可同时等待处理的卡片数量。",
+	},
+	{
+		code: RobotInterceptItemCode, name: "机器人拦截", category: "safety", defaultLevel: 1,
+		effects:     []int{0, 45, 55, 64, 72, 80, 87, 94, 100},
+		prices:      []int64{0, 0, 600, 1200, 2500, 5000, 10000, 22000, 45000},
+		description: "决定后续风扇吹动未刮卡时，机器人成功拦截并保护卡片的概率。",
+	},
 }
 
-func Shop(balance int64, luckLevel, scratchLevel uint8, trashOwned, cardSlotsOwned bool) domain.ShopStatus {
+func Shop(balance int64, luckLevel, scratchLevel uint8, trashOwned, cardSlotsOwned, robotOwned bool, robotSpeedLevel, robotQueueLevel, robotInterceptLevel uint8) domain.ShopStatus {
 	levels := map[string]uint8{
 		LuckItemCode: luckLevel, ScratchRangeItemCode: scratchLevel,
 		TrashItemCode: boolLevel(trashOwned), CardSlotsItemCode: boolLevel(cardSlotsOwned),
+		RobotItemCode: boolLevel(robotOwned), RobotSpeedItemCode: robotSpeedLevel,
+		RobotQueueItemCode: robotQueueLevel, RobotInterceptItemCode: robotInterceptLevel,
 	}
 	items := make([]domain.ShopItem, 0, len(itemDefinitions))
 	for _, definition := range itemDefinitions {
 		level := levels[definition.code]
-		if level < definition.defaultLevel {
+		if level < definition.defaultLevel && (robotOwned || !isRobotModule(definition.code)) {
 			level = definition.defaultLevel
 		}
-		items = append(items, shopItem(definition, level, balance))
+		item := shopItem(definition, level, balance)
+		if !robotOwned && isRobotModule(definition.code) {
+			item.Locked = true
+			item.LockedReason = "请先购买自动刮奖机器人"
+			item.NextPrice = 0
+		}
+		items = append(items, item)
 	}
 	return domain.ShopStatus{Items: items, LuckCards: LuckCardImpacts(luckLevel)}
+}
+
+func isRobotModule(code string) bool {
+	return code == RobotSpeedItemCode || code == RobotQueueItemCode || code == RobotInterceptItemCode
 }
 
 func UpgradeDefinition(code string, currentLevel uint8) (domain.ShopItem, bool) {

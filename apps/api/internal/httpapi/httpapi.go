@@ -71,6 +71,9 @@ func New(service *service.Service, store store.Store, logger *slog.Logger, cooki
 	mux.Handle("POST /api/v1/tickets/{id}/redeem", api.requireUser(http.HandlerFunc(api.redeem)))
 	mux.Handle("PATCH /api/v1/tickets/{id}/placement", api.requireUser(http.HandlerFunc(api.placeTicket)))
 	mux.Handle("POST /api/v1/tickets/{id}/discard", api.requireUser(http.HandlerFunc(api.discardTicket)))
+	mux.Handle("GET /api/v1/robot", api.requireUser(http.HandlerFunc(api.robotStatus)))
+	mux.Handle("POST /api/v1/robot/tickets/{id}", api.requireUser(http.HandlerFunc(api.enqueueRobot)))
+	mux.Handle("POST /api/v1/robot/tick", api.requireUser(http.HandlerFunc(api.tickRobot)))
 	mux.Handle("GET /api/v1/daily", api.requireUser(http.HandlerFunc(api.dailyStatus)))
 	mux.Handle("POST /api/v1/daily/login-claim", api.requireUser(http.HandlerFunc(api.claimDailyLogin)))
 	mux.Handle("POST /api/v1/daily/plates/start", api.requireUser(http.HandlerFunc(api.startPlate)))
@@ -236,6 +239,33 @@ func (api *API) discardTicket(response http.ResponseWriter, request *http.Reques
 	writeJSON(response, http.StatusOK, map[string]any{"ticket": ticket})
 }
 
+func (api *API) robotStatus(response http.ResponseWriter, request *http.Request) {
+	status, err := api.service.RobotStatus(request.Context(), currentUser(request))
+	if err != nil {
+		api.writeError(response, request, err)
+		return
+	}
+	writeJSON(response, http.StatusOK, map[string]any{"robot": status})
+}
+
+func (api *API) enqueueRobot(response http.ResponseWriter, request *http.Request) {
+	result, err := api.service.EnqueueRobot(request.Context(), currentUser(request), request.PathValue("id"))
+	if err != nil {
+		api.writeError(response, request, err)
+		return
+	}
+	writeJSON(response, http.StatusCreated, result)
+}
+
+func (api *API) tickRobot(response http.ResponseWriter, request *http.Request) {
+	result, err := api.service.TickRobot(request.Context(), currentUser(request))
+	if err != nil {
+		api.writeError(response, request, err)
+		return
+	}
+	writeJSON(response, http.StatusOK, result)
+}
+
 func (api *API) dailyStatus(response http.ResponseWriter, request *http.Request) {
 	status, err := api.service.DailyStatus(request.Context(), currentUser(request))
 	if err != nil {
@@ -332,6 +362,14 @@ func (api *API) writeError(response http.ResponseWriter, request *http.Request, 
 		writeAPIError(response, http.StatusConflict, "trash_required", "请先在商店购买垃圾桶")
 	case errors.Is(err, store.ErrCardSlotsRequired):
 		writeAPIError(response, http.StatusConflict, "card_slots_required", "请先在商店购买固定卡槽")
+	case errors.Is(err, store.ErrRobotRequired):
+		writeAPIError(response, http.StatusConflict, "robot_required", "请先在商店购买自动刮奖机器人")
+	case errors.Is(err, store.ErrRobotQueueFull):
+		writeAPIError(response, http.StatusConflict, "robot_queue_full", "机器人队列已经放满")
+	case errors.Is(err, store.ErrRobotManaged):
+		writeAPIError(response, http.StatusConflict, "robot_managed", "这张卡正在机器人队列中")
+	case errors.Is(err, store.ErrRobotUnsupported):
+		writeAPIError(response, http.StatusConflict, "robot_unsupported", "《放手一博》只能手动刮奖")
 	case errors.Is(err, store.ErrNotFound):
 		writeAPIError(response, http.StatusNotFound, "not_found", "没有找到对应内容")
 	case errors.Is(err, store.ErrInvalidState):

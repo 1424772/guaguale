@@ -3,14 +3,18 @@ package domain
 import "time"
 
 type User struct {
-	ID             uint64    `json:"id"`
-	Username       string    `json:"username"`
-	Balance        int64     `json:"balance"`
-	LuckLevel      uint8     `json:"luckLevel"`
-	ScratchLevel   uint8     `json:"scratchLevel"`
-	TrashOwned     bool      `json:"trashOwned"`
-	CardSlotsOwned bool      `json:"cardSlotsOwned"`
-	CreatedAt      time.Time `json:"createdAt"`
+	ID                  uint64    `json:"id"`
+	Username            string    `json:"username"`
+	Balance             int64     `json:"balance"`
+	LuckLevel           uint8     `json:"luckLevel"`
+	ScratchLevel        uint8     `json:"scratchLevel"`
+	TrashOwned          bool      `json:"trashOwned"`
+	CardSlotsOwned      bool      `json:"cardSlotsOwned"`
+	RobotOwned          bool      `json:"robotOwned"`
+	RobotSpeedLevel     uint8     `json:"robotSpeedLevel"`
+	RobotQueueLevel     uint8     `json:"robotQueueLevel"`
+	RobotInterceptLevel uint8     `json:"robotInterceptLevel"`
+	CreatedAt           time.Time `json:"createdAt"`
 }
 
 type Session struct {
@@ -30,9 +34,10 @@ const (
 )
 
 const (
-	TicketInTray TicketLocation = "tray"
-	TicketOnDesk TicketLocation = "desk"
-	TicketInSlot TicketLocation = "slot"
+	TicketInTray  TicketLocation = "tray"
+	TicketOnDesk  TicketLocation = "desk"
+	TicketInSlot  TicketLocation = "slot"
+	TicketInRobot TicketLocation = "robot"
 )
 
 type Ticket struct {
@@ -121,6 +126,8 @@ type ShopItem struct {
 	Description       string   `json:"description"`
 	Notice            string   `json:"notice,omitempty"`
 	RelockedCards     []string `json:"relockedCards"`
+	Locked            bool     `json:"locked"`
+	LockedReason      string   `json:"lockedReason,omitempty"`
 }
 
 type ShopStatus struct {
@@ -154,4 +161,28 @@ type ItemUpgrade struct {
 	Price          int64
 	IdempotencyKey string
 	CreatedAt      time.Time
+}
+
+type RobotQueueItem struct {
+	TicketID    string `json:"ticketId"`
+	CardCode    string `json:"cardCode"`
+	CardName    string `json:"cardName"`
+	RemainingMS int64  `json:"remainingMs"`
+	Position    int    `json:"position"`
+}
+
+type RobotStatus struct {
+	Owned            bool             `json:"owned"`
+	SpeedLevel       uint8            `json:"speedLevel"`
+	QueueLevel       uint8            `json:"queueLevel"`
+	InterceptLevel   uint8            `json:"interceptLevel"`
+	DurationSeconds  int              `json:"durationSeconds"`
+	Capacity         int              `json:"capacity"`
+	InterceptPercent int              `json:"interceptPercent"`
+	Queue            []RobotQueueItem `json:"queue"`
+}
+
+type RobotEvent struct {
+	Ticket       Ticket `json:"ticket"`
+	AutoRedeemed bool   `json:"autoRedeemed"`
 }

@@ -79,6 +79,17 @@ type UpgradeResult struct {
 	Idempotent bool               `json:"idempotent"`
 }
 
+type RobotEnqueueResult struct {
+	Ticket domain.Ticket      `json:"ticket"`
+	Robot  domain.RobotStatus `json:"robot"`
+}
+
+type RobotTickResult struct {
+	User  domain.User        `json:"user"`
+	Robot domain.RobotStatus `json:"robot"`
+	Event *domain.RobotEvent `json:"event,omitempty"`
+}
+
 func New(store store.Store) *Service {
 	return &Service{store: store, now: time.Now, drawCard: game.Draw}
 }
@@ -136,7 +147,8 @@ func (service *Service) Cards(balance int64) []domain.Card {
 }
 
 func (service *Service) Shop(user domain.User) domain.ShopStatus {
-	return game.Shop(user.Balance, user.LuckLevel, user.ScratchLevel, user.TrashOwned, user.CardSlotsOwned)
+	return game.Shop(user.Balance, user.LuckLevel, user.ScratchLevel, user.TrashOwned, user.CardSlotsOwned,
+		user.RobotOwned, user.RobotSpeedLevel, user.RobotQueueLevel, user.RobotInterceptLevel)
 }
 
 func (service *Service) UpgradeItem(ctx context.Context, user domain.User, itemCode, idempotencyKey string) (UpgradeResult, error) {
@@ -158,6 +170,23 @@ func (service *Service) UpgradeItem(ctx context.Context, user domain.User, itemC
 		} else {
 			currentLevel = 0
 		}
+	} else if itemCode == game.RobotItemCode {
+		currentLevel = boolLevel(user.RobotOwned)
+	} else if itemCode == game.RobotSpeedItemCode {
+		if !user.RobotOwned {
+			return UpgradeResult{}, store.ErrRobotRequired
+		}
+		currentLevel = user.RobotSpeedLevel
+	} else if itemCode == game.RobotQueueItemCode {
+		if !user.RobotOwned {
+			return UpgradeResult{}, store.ErrRobotRequired
+		}
+		currentLevel = user.RobotQueueLevel
+	} else if itemCode == game.RobotInterceptItemCode {
+		if !user.RobotOwned {
+			return UpgradeResult{}, store.ErrRobotRequired
+		}
+		currentLevel = user.RobotInterceptLevel
 	} else if itemCode != game.LuckItemCode {
 		return UpgradeResult{}, ErrItemUnavailable
 	}
@@ -183,6 +212,63 @@ func (service *Service) UpgradeItem(ctx context.Context, user domain.User, itemC
 		User: updatedUser, Shop: service.Shop(updatedUser), Upgrade: upgrade,
 		ItemCode: upgrade.ItemCode, Idempotent: idempotent,
 	}, nil
+}
+
+func boolLevel(value bool) uint8 {
+	if value {
+		return 1
+	}
+	return 0
+}
+
+func (service *Service) RobotStatus(ctx context.Context, user domain.User) (domain.RobotStatus, error) {
+	queue, err := service.store.ListRobotQueue(ctx, user.ID)
+	if err != nil {
+		return domain.RobotStatus{}, err
+	}
+	return robotStatus(user, queue), nil
+}
+
+func (service *Service) EnqueueRobot(ctx context.Context, user domain.User, ticketID string) (RobotEnqueueResult, error) {
+	if !validTicketID(ticketID) {
+		return RobotEnqueueResult{}, ErrInvalidInput
+	}
+	if !user.RobotOwned {
+		return RobotEnqueueResult{}, store.ErrRobotRequired
+	}
+	durationMS := int64(game.RobotDurationSeconds(user.RobotSpeedLevel)) * 1000
+	ticket, queue, err := service.store.EnqueueRobot(ctx, store.EnqueueRobotInput{
+		UserID: user.ID, TicketID: ticketID, DurationMS: durationMS,
+		Capacity: game.RobotQueueCapacity(user.RobotQueueLevel), EnqueuedAt: service.now().UTC(),
+	})
+	if err != nil {
+		return RobotEnqueueResult{}, err
+	}
+	return RobotEnqueueResult{Ticket: ticket, Robot: robotStatus(user, queue)}, nil
+}
+
+func (service *Service) TickRobot(ctx context.Context, user domain.User) (RobotTickResult, error) {
+	if !user.RobotOwned {
+		return RobotTickResult{}, store.ErrRobotRequired
+	}
+	durationMS := int64(game.RobotDurationSeconds(user.RobotSpeedLevel)) * 1000
+	updatedUser, event, queue, err := service.store.TickRobot(ctx, user.ID, service.now().UTC(), durationMS)
+	if err != nil {
+		return RobotTickResult{}, err
+	}
+	return RobotTickResult{User: updatedUser, Robot: robotStatus(updatedUser, queue), Event: event}, nil
+}
+
+func robotStatus(user domain.User, queue []domain.RobotQueueItem) domain.RobotStatus {
+	if queue == nil {
+		queue = []domain.RobotQueueItem{}
+	}
+	return domain.RobotStatus{
+		Owned: user.RobotOwned, SpeedLevel: user.RobotSpeedLevel, QueueLevel: user.RobotQueueLevel,
+		InterceptLevel: user.RobotInterceptLevel, DurationSeconds: game.RobotDurationSeconds(user.RobotSpeedLevel),
+		Capacity: game.RobotQueueCapacity(user.RobotQueueLevel), InterceptPercent: game.RobotInterceptPercent(user.RobotInterceptLevel),
+		Queue: queue,
+	}
 }
 
 func (service *Service) Purchase(ctx context.Context, user domain.User, cardCode, idempotencyKey string) (PurchaseResult, error) {

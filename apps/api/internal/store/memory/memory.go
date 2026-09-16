@@ -27,6 +27,14 @@ type Store struct {
 	daily             map[string]domain.DailyStatus
 	plateActions      map[string]plateRecord
 	upgradeByUserKey  map[string]domain.ItemUpgrade
+	robotQueues       map[uint64][]robotJob
+	robotLastTicks    map[uint64]time.Time
+}
+
+type robotJob struct {
+	ticketID    string
+	remainingMS int64
+	enqueuedAt  time.Time
 }
 
 type plateRecord struct {
@@ -46,6 +54,8 @@ func New() *Store {
 		daily:             make(map[string]domain.DailyStatus),
 		plateActions:      make(map[string]plateRecord),
 		upgradeByUserKey:  make(map[string]domain.ItemUpgrade),
+		robotQueues:       make(map[uint64][]robotJob),
+		robotLastTicks:    make(map[uint64]time.Time),
 	}
 }
 
@@ -89,6 +99,23 @@ func (store *Store) UpgradeItem(_ context.Context, input basestore.UpgradeItemIn
 		currentLevel = boolLevel(record.user.TrashOwned)
 	} else if input.ItemCode == "card-slots" {
 		currentLevel = boolLevel(record.user.CardSlotsOwned)
+	} else if input.ItemCode == "robot" {
+		currentLevel = boolLevel(record.user.RobotOwned)
+	} else if input.ItemCode == "robot-speed" {
+		if !record.user.RobotOwned {
+			return domain.User{}, domain.ItemUpgrade{}, false, basestore.ErrRobotRequired
+		}
+		currentLevel = record.user.RobotSpeedLevel
+	} else if input.ItemCode == "robot-queue" {
+		if !record.user.RobotOwned {
+			return domain.User{}, domain.ItemUpgrade{}, false, basestore.ErrRobotRequired
+		}
+		currentLevel = record.user.RobotQueueLevel
+	} else if input.ItemCode == "robot-intercept" {
+		if !record.user.RobotOwned {
+			return domain.User{}, domain.ItemUpgrade{}, false, basestore.ErrRobotRequired
+		}
+		currentLevel = record.user.RobotInterceptLevel
 	} else if input.ItemCode != "luck" {
 		return domain.User{}, domain.ItemUpgrade{}, false, basestore.ErrInvalidState
 	}
@@ -108,8 +135,19 @@ func (store *Store) UpgradeItem(_ context.Context, input basestore.UpgradeItemIn
 		record.user.ScratchLevel = input.ToLevel
 	} else if input.ItemCode == "trash" {
 		record.user.TrashOwned = true
-	} else {
+	} else if input.ItemCode == "card-slots" {
 		record.user.CardSlotsOwned = true
+	} else if input.ItemCode == "robot" {
+		record.user.RobotOwned = true
+		record.user.RobotSpeedLevel = 1
+		record.user.RobotQueueLevel = 1
+		record.user.RobotInterceptLevel = 1
+	} else if input.ItemCode == "robot-speed" {
+		record.user.RobotSpeedLevel = input.ToLevel
+	} else if input.ItemCode == "robot-queue" {
+		record.user.RobotQueueLevel = input.ToLevel
+	} else {
+		record.user.RobotInterceptLevel = input.ToLevel
 	}
 	store.users[input.UserID] = record
 	upgrade := domain.ItemUpgrade{
@@ -361,6 +399,9 @@ func (store *Store) ScratchTicket(_ context.Context, userID uint64, ticketID str
 		return domain.Ticket{}, basestore.ErrNotFound
 	}
 	if ticket.State == domain.TicketPurchased {
+		if ticket.Location == domain.TicketInRobot {
+			return domain.Ticket{}, basestore.ErrRobotManaged
+		}
 		now := time.Now().UTC()
 		ticket.State = domain.TicketScratched
 		ticket.ScratchedAt = &now
@@ -409,6 +450,9 @@ func (store *Store) UpdateTicketPlacement(_ context.Context, userID uint64, tick
 	if ticket.State != domain.TicketPurchased && ticket.State != domain.TicketScratched {
 		return domain.Ticket{}, basestore.ErrInvalidState
 	}
+	if ticket.Location == domain.TicketInRobot {
+		return domain.Ticket{}, basestore.ErrRobotManaged
+	}
 	if placement.Location == domain.TicketInSlot && !store.users[userID].user.CardSlotsOwned {
 		return domain.Ticket{}, basestore.ErrCardSlotsRequired
 	}
@@ -438,6 +482,9 @@ func (store *Store) DiscardTicket(_ context.Context, userID uint64, ticketID str
 	}
 	if ticket.Location == domain.TicketInSlot {
 		return domain.Ticket{}, basestore.ErrProtected
+	}
+	if ticket.Location == domain.TicketInRobot {
+		return domain.Ticket{}, basestore.ErrRobotManaged
 	}
 	if !store.users[userID].user.TrashOwned {
 		return domain.Ticket{}, basestore.ErrTrashRequired
