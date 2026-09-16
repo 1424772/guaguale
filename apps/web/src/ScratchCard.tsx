@@ -176,6 +176,8 @@ export function scratchLayoutFor(cardCode: string, symbolCount: number) {
 
 export function ScratchCard({ cardCode, cardName, symbols, scratchLevel, prizeTier = 'none', onComplete, onProgress }: ScratchCardProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const debrisLayerRef = useRef<HTMLDivElement>(null)
+  const scratchToolRef = useRef<HTMLDivElement>(null)
   const opaqueIndexesRef = useRef<number[][]>([])
   const revealedRef = useRef<Set<number>>(new Set())
   const drawingRef = useRef(false)
@@ -184,6 +186,7 @@ export function ScratchCard({ cardCode, cardName, symbols, scratchLevel, prizeTi
   const moveCountRef = useRef(0)
   const [progress, setProgress] = useState(0)
   const [revealedIndexes, setRevealedIndexes] = useState<number[]>([])
+  const [isScratching, setIsScratching] = useState(false)
   const { columns, stageHeight, cells: cellBounds } = scratchLayoutFor(cardCode, symbols.length)
   const revealThreshold = cardCode === 'all-in' ? 70 : 65
   const rangePercent = scratchEffects[Math.max(1, Math.min(10, scratchLevel))]
@@ -305,9 +308,60 @@ export function ScratchCard({ cardCode, cardName, symbols, scratchLevel, prizeTi
     context.moveTo(last.x, last.y)
     context.lineTo(x, y)
     context.stroke()
+    const deltaX = x - last.x
+    const deltaY = y - last.y
+    const distance = Math.hypot(deltaX, deltaY)
+    if (distance > 1) {
+      context.save()
+      context.globalAlpha = .72
+      context.lineWidth = brushRadius * .52
+      const normalX = -deltaY / distance
+      const normalY = deltaX / distance
+      const edgeOffset = brushRadius * .36
+      context.beginPath()
+      context.moveTo(last.x + normalX * edgeOffset, last.y + normalY * edgeOffset)
+      context.lineTo(x + normalX * edgeOffset, y + normalY * edgeOffset)
+      context.stroke()
+      context.beginPath()
+      context.moveTo(last.x - normalX * edgeOffset, last.y - normalY * edgeOffset)
+      context.lineTo(x - normalX * edgeOffset, y - normalY * edgeOffset)
+      context.stroke()
+      context.restore()
+    }
     lastPointRef.current = { x, y }
     moveCountRef.current++
+    updateScratchTool(x, y, Math.atan2(deltaY, deltaX))
+    if (moveCountRef.current % 2 === 0) spawnScratchDebris(x, y, Math.atan2(deltaY, deltaX), 3)
     if (moveCountRef.current % 4 === 0) measureProgress(context, canvas)
+  }
+
+  function updateScratchTool(x: number, y: number, angle: number) {
+    const tool = scratchToolRef.current
+    if (!tool) return
+    tool.style.left = `${x / 7.2}%`
+    tool.style.top = `${y / stageHeight * 100}%`
+    tool.style.setProperty('--scratch-angle', `${angle}rad`)
+  }
+
+  function spawnScratchDebris(x: number, y: number, angle: number, amount: number) {
+    const layer = debrisLayerRef.current
+    if (!layer) return
+    for (let index = 0; index < amount; index++) {
+      const flake = document.createElement('i')
+      const spread = (Math.random() - .5) * Math.PI * .9
+      const force = 13 + Math.random() * 27
+      const direction = angle - Math.PI / 2 + spread
+      flake.className = `scratch-flake tone-${(moveCountRef.current + index) % 3}`
+      flake.style.left = `${x / 7.2}%`
+      flake.style.top = `${y / stageHeight * 100}%`
+      flake.style.width = `${2.5 + Math.random() * 5}px`
+      flake.style.height = `${1.5 + Math.random() * 3}px`
+      flake.style.setProperty('--flake-x', `${Math.cos(direction) * force}px`)
+      flake.style.setProperty('--flake-y', `${Math.sin(direction) * force - 8}px`)
+      flake.style.setProperty('--flake-spin', `${(Math.random() - .5) * 540}deg`)
+      flake.addEventListener('animationend', () => flake.remove(), { once: true })
+      layer.appendChild(flake)
+    }
   }
 
   function measureProgress(context: CanvasRenderingContext2D, canvas: HTMLCanvasElement) {
@@ -338,6 +392,12 @@ export function ScratchCard({ cardCode, cardName, symbols, scratchLevel, prizeTi
   function finish(context: CanvasRenderingContext2D, canvas: HTMLCanvasElement) {
     if (completedRef.current) return
     completedRef.current = true
+    const burstCells = cellBounds.length ? cellBounds : [{ x: 0, y: 0, width: 720, height: stageHeight }]
+    burstCells.forEach((cell, index) => {
+      if (index % Math.max(1, Math.ceil(burstCells.length / 6)) === 0) {
+        spawnScratchDebris(cell.x + cell.width / 2, cell.y + cell.height / 2, -Math.PI / 2, 5)
+      }
+    })
     context.clearRect(0, 0, 720, stageHeight)
     setRevealedIndexes(symbols.map((_, index) => index))
     setProgress(100)
@@ -347,7 +407,7 @@ export function ScratchCard({ cardCode, cardName, symbols, scratchLevel, prizeTi
 
   const complete = completedRef.current
   return (
-    <div className={`scratch-card scratch-card-${cardCode} tier-${prizeTier} ${tripleMatch ? 'is-triple' : ''} ${complete ? 'is-complete' : ''}`}>
+    <div className={`scratch-card scratch-card-${cardCode} tier-${prizeTier} ${tripleMatch ? 'is-triple' : ''} ${isScratching ? 'is-scratching' : ''} ${complete ? 'is-complete' : ''}`}>
       <div className="ticket-heading">
           <span>{cardName}</span>
           <strong>{cardCode === 'eternal-color-diamond' ? '五项彩钻鉴定' : cardCode === 'all-in' ? '唯一终局刮层' : `${symbols.length} 格刮奖区域`}</strong>
@@ -372,11 +432,15 @@ export function ScratchCard({ cardCode, cardName, symbols, scratchLevel, prizeTi
             )
           })}
         </div>
+        <div className="scratch-debris-layer" ref={debrisLayerRef} aria-hidden="true" />
+        <div className="scratch-tool" ref={scratchToolRef} aria-hidden="true"><i /></div>
+        <div className="scratch-finish-flash" aria-hidden="true" />
         <canvas
           ref={canvasRef}
           className="scratch-layer"
           onPointerDown={(event) => {
             drawingRef.current = true
+            setIsScratching(true)
             lastPointRef.current = null
             event.currentTarget.setPointerCapture(event.pointerId)
             scratch(event)
@@ -384,11 +448,12 @@ export function ScratchCard({ cardCode, cardName, symbols, scratchLevel, prizeTi
           onPointerMove={scratch}
           onPointerUp={(event) => {
             drawingRef.current = false
+            setIsScratching(false)
             lastPointRef.current = null
             const context = event.currentTarget.getContext('2d', { willReadFrequently: true })
             if (context && !completedRef.current) measureProgress(context, event.currentTarget)
           }}
-          onPointerCancel={() => { drawingRef.current = false; lastPointRef.current = null }}
+          onPointerCancel={() => { drawingRef.current = false; lastPointRef.current = null; setIsScratching(false) }}
           aria-label="刮奖区域"
         />
       </div>
