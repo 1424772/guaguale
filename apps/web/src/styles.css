@@ -893,6 +893,274 @@ button { color: inherit; }
   .ticket-robot { right: 68px; }
 }
 
+/* Production desk scene v2: the functional DOM is layered over clean scene artwork. */
+.game-shell {
+  min-height: 100dvh;
+  overflow-x: hidden;
+  background: #1b0d07;
+}
+
+.topbar {
+  position: sticky;
+  min-height: 64px;
+  padding: 5px clamp(20px, 5vw, 82px);
+  border-bottom-color: rgba(187,145,67,.55);
+  background:
+    linear-gradient(90deg, rgba(5,24,19,.97), rgba(8,38,30,.98) 52%, rgba(4,20,17,.98)),
+    repeating-linear-gradient(105deg, transparent 0 16px, rgba(255,255,255,.018) 17px 18px);
+  box-shadow: 0 8px 20px rgba(0,0,0,.38), inset 0 -1px rgba(218,181,100,.13);
+}
+
+.topbar::after { content: ""; position: absolute; left: 0; right: 0; bottom: -4px; height: 4px; background: linear-gradient(#5b3d21, #1c1009); }
+.identity { min-width: 280px; }
+.avatar { width: 48px; height: 48px; border-color: #c9a554; background: radial-gradient(circle at 38% 30%, #c69646, #5a381c 72%); box-shadow: inset 0 0 0 3px #102a22, 0 2px 8px #000; }
+.identity small { max-width: 190px; overflow: hidden; color: #d9cdb0; text-overflow: ellipsis; white-space: nowrap; }
+.identity strong { color: #ffe39a; font: 800 20px/1.1 Georgia, "Songti SC", serif; text-shadow: 0 2px 5px #000; }
+.topbar nav button { position: relative; min-width: 112px; padding: 0 18px; color: #f6e7bb; border-left-color: rgba(221,193,131,.13); font: 800 15px/1 Georgia, "Songti SC", serif; }
+.topbar nav button::before { display: inline-block; margin-right: 9px; color: #e9c978; font-size: 20px; vertical-align: -2px; }
+.topbar nav button:nth-child(1)::before { content: "▣"; }
+.topbar nav button:nth-child(2)::before { content: "⌑"; }
+.topbar nav button:nth-child(3)::before { content: "♜"; }
+.topbar nav button:nth-child(4)::before { content: "▤"; }
+.topbar nav button:nth-child(5)::before { content: "⚙"; }
+
+.desk {
+  position: relative;
+  width: 100%;
+  max-width: none;
+  height: max(calc(100dvh - 64px), 56.25vw);
+  min-height: 720px;
+  display: block;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  background: #4c2412 url('./assets/desk-scene-pc-v1.webp') center top / 100% 100% no-repeat;
+  isolation: isolate;
+}
+
+.desk::after { content: ""; position: absolute; z-index: 0; inset: 0; pointer-events: none; background: radial-gradient(circle at 72% 10%, transparent 0 25%, rgba(25,7,1,.08) 65%, rgba(10,3,0,.32) 100%); }
+.table-area { position: absolute; z-index: 3; inset: 0; min-width: 0; }
+.table-heading { display: none; }
+
+.catalog-dock {
+  position: absolute;
+  z-index: 32;
+  left: 2.8%;
+  top: 5.2%;
+  width: 26.5%;
+  height: 27.5%;
+  min-width: 300px;
+  overflow: visible;
+  border: 5px solid #192b25;
+  border-radius: 18px;
+  color: #f3d88d;
+  background: linear-gradient(145deg, rgba(22,48,40,.96), rgba(5,21,18,.98));
+  box-shadow: inset 0 0 0 2px #735b35, inset 0 0 28px #000, 0 18px 28px rgba(0,0,0,.5);
+  cursor: pointer;
+}
+.catalog-dock::before { content: ""; position: absolute; inset: 8px; border: 1px dashed rgba(218,181,104,.38); border-radius: 11px; pointer-events: none; }
+.catalog-dock::after { content: ""; position: absolute; left: 30%; right: 30%; bottom: -15px; height: 29px; border: 2px solid #6d4b22; border-radius: 4px; background: linear-gradient(#d8ad5b, #735022 46%, #b98335); box-shadow: inset 0 0 0 2px #edce85, 0 5px 8px #000; }
+.catalog-dock > strong { position: absolute; z-index: 5; left: 36%; right: 36%; bottom: -7px; color: #24170a; font: 900 13px/1 Georgia, "Songti SC", serif; white-space: nowrap; }
+.catalog-dock > small { position: absolute; z-index: 4; right: 14px; top: 12px; padding: 4px 8px; border-radius: 99px; color: #f8dda0; background: rgba(4,20,16,.88); font-size: 10px; }
+.catalog-stack { position: absolute; inset: 16px 22px 24px; }
+.catalog-stack i { position: absolute; inset: 4% 4% 2%; border: 2px solid #d5b769; border-radius: 6px; background: url('./assets/concepts/lingqian-ticket-play-v1.webp') center / cover; box-shadow: 0 8px 13px rgba(0,0,0,.5); }
+.catalog-stack i:nth-child(1) { transform: translate(-4%, 3%) rotate(-4deg); filter: hue-rotate(165deg) saturate(1.15); }
+.catalog-stack i:nth-child(2) { transform: translate(3%, 0) rotate(3deg); filter: hue-rotate(230deg) saturate(1.2); }
+.catalog-stack i:nth-child(3) { transform: translate(0, 7%) rotate(-1deg); }
+
+.catalog-scrim { position: fixed; z-index: 69; inset: 64px 0 0; border: 0; background: rgba(2,8,6,.64); backdrop-filter: blur(3px); cursor: default; }
+.catalog-panel { position: fixed; z-index: 70; top: 78px; bottom: 18px; left: 18px; width: min(440px, calc(100vw - 36px)); overflow-y: auto; align-self: auto; animation: catalog-enter .3s ease-out both; }
+.catalog-close { position: absolute; z-index: 5; top: 10px; right: 12px; width: 36px; height: 36px; border: 1px solid #8a6f3b; border-radius: 50%; color: #f2d17b; background: #0a251d; font-size: 23px; cursor: pointer; }
+@keyframes catalog-enter { from { opacity: 0; transform: translateX(-35px); } to { opacity: 1; transform: none; } }
+
+.desk-zones { position: absolute; z-index: 28; inset: 0; display: block; margin: 0; pointer-events: none; }
+.desk-zones > * { pointer-events: auto; }
+.fan-station {
+  position: absolute;
+  left: 30.3%;
+  top: 3.6%;
+  width: 10.5%;
+  min-width: 124px;
+  aspect-ratio: .88;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1fr;
+  place-content: end center;
+  padding: 0 8px 9px;
+  border: 0;
+  border-radius: 18px 18px 13px 13px;
+  overflow: visible;
+  background: radial-gradient(circle at 50% 39%, #8d6b36 0 6%, #21180f 7% 9%, transparent 10%), linear-gradient(145deg, #72552f, #211a13 72%);
+  box-shadow: inset 0 0 0 2px #b18a4b, inset 0 -22px 20px rgba(0,0,0,.4), 0 15px 22px rgba(0,0,0,.52);
+}
+.fan-station > span { position: absolute; z-index: 1; left: 50%; top: -12%; width: 88%; height: clamp(108px, 9vw, 150px); display: grid; place-items: center; transform: translateX(-50%); border: 5px double #b58b48; border-radius: 50%; color: #d0a85f; background: repeating-radial-gradient(circle, transparent 0 13%, rgba(191,151,79,.7) 14% 15%, transparent 16% 24%), #2a2118; box-shadow: inset 0 0 16px #000, 0 6px 12px #000; font-size: clamp(45px, 5vw, 78px); line-height: 1; }
+.fan-station.working > span { transform: translateX(-50%); animation: fan-spin-centered .24s linear infinite; }
+.fan-station strong { position: relative; z-index: 2; width: 100%; padding: 8px 4px; border: 2px solid #937039; border-radius: 6px; color: #2a1909; background: linear-gradient(#e6c276, #8d622c); text-shadow: 0 1px rgba(255,255,255,.35); font-size: 12px; text-align: center; }
+.fan-station small { display: none; }
+.fan-station > i { z-index: 4; top: 7px; right: 9px; padding: 3px 5px; border-radius: 4px; color: #fff0b9; background: #7b3527; }
+@keyframes fan-spin-centered { to { transform: translateX(-50%) rotate(360deg); } }
+
+.redeem-drop-zone {
+  position: absolute;
+  left: 42.2%;
+  top: 5%;
+  width: 22%;
+  height: 12.5%;
+  min-height: 94px;
+  display: grid;
+  place-content: start center;
+  padding: 14px 22px;
+  border: 3px solid #79521f;
+  border-radius: 8px;
+  color: #201207;
+  background: linear-gradient(115deg, #8b5d25, #f0cf81 27%, #9b682b 54%, #e1ba67 76%, #795021);
+  box-shadow: inset 0 0 0 2px #f0d78f, inset 0 -22px 22px rgba(68,36,10,.25), 0 13px 19px rgba(0,0,0,.46);
+}
+.redeem-drop-zone::before { content: ""; position: absolute; left: 8%; right: 8%; bottom: 14%; height: 25%; border: 4px solid #4c3218; border-radius: 3px; background: #080907; box-shadow: inset 0 4px 9px #000, 0 1px #f5d384; }
+.redeem-drop-zone span { color: #1e1208; font-size: clamp(17px, 1.45vw, 25px); text-shadow: 0 1px #ffe5a7; }
+.redeem-drop-zone span::before, .redeem-drop-zone span::after { content: "❧"; margin: 0 18px; color: #684214; }
+.redeem-drop-zone strong, .redeem-drop-zone small { display: none; }
+
+.trash-drop-zone {
+  position: absolute;
+  right: 1%;
+  bottom: -1.5%;
+  width: 9.8%;
+  height: 21%;
+  min-width: 120px;
+  display: grid;
+  grid-template-columns: 1fr;
+  place-content: end center;
+  padding: 14px 9px 22px;
+  border: 5px solid #77624c;
+  border-radius: 48% 48% 18% 18% / 17% 17% 10% 10%;
+  color: #ead59a;
+  background: linear-gradient(90deg, #171918, #4a4943 48%, #111312);
+  box-shadow: inset 10px 0 18px #050505, inset -7px 0 12px rgba(255,255,255,.1), 0 18px 26px rgba(0,0,0,.6);
+}
+.trash-drop-zone.locked-zone { position: absolute; }
+.trash-drop-zone.locked-zone::after, .fixed-slot-panel.locked-zone::after { content: "已锁定"; }
+.trash-drop-zone::before { content: ""; position: absolute; left: -6px; right: -6px; top: -8px; height: 25px; border: 4px solid #89745a; border-radius: 50%; background: #080909; box-shadow: inset 0 7px 10px #000; }
+.trash-drop-zone > span { display: none; }
+.trash-drop-zone strong { align-self: end; font: 900 16px/1 Georgia, "Songti SC", serif; text-align: center; text-shadow: 0 2px #000; }
+.trash-drop-zone small { display: none; }
+.trash-drop-zone button { grid-column: 1; min-height: 30px; margin-top: 8px; font-size: 10px; }
+
+.fixed-slot-panel {
+  position: absolute;
+  z-index: 24;
+  left: 0;
+  bottom: 4.2%;
+  top: auto;
+  width: 31.5%;
+  min-height: 38%;
+  margin: 0;
+  padding: 18px 20px 22px;
+  border: 5px solid #172a24;
+  border-radius: 0 18px 18px 0;
+  background: linear-gradient(145deg, rgba(21,46,39,.98), rgba(5,20,17,.98));
+  box-shadow: inset 0 0 0 2px #785f38, inset 0 0 30px #000, 0 18px 28px rgba(0,0,0,.48);
+}
+.fixed-slot-panel.locked-zone { position: absolute; }
+.fixed-slot-panel::before { content: ""; position: absolute; inset: 9px; border: 1px dashed rgba(213,179,105,.32); border-radius: 10px; pointer-events: none; }
+.fixed-slot-heading { position: relative; z-index: 2; margin-bottom: 10px; padding: 0 7px 8px; border-bottom: 1px solid rgba(211,178,105,.24); }
+.fixed-slot-heading .eyebrow { display: none; }
+.fixed-slot-heading h2 { color: #e8cb80; font-size: 18px; }
+.fixed-slots { position: relative; z-index: 2; gap: 7px; }
+.fixed-slot { min-height: clamp(58px, 7vw, 100px); border: 3px solid #394b41; border-radius: 5px 5px 16px 16px; background: linear-gradient(90deg, #151c19, #25352e 52%, #111815); box-shadow: inset 0 0 0 2px #090e0c, 0 3px 5px #000; }
+.slot-lock-copy { position: relative; z-index: 2; min-height: clamp(150px, 21vw, 260px); border-color: rgba(208,174,100,.28); }
+
+.free-desk { position: absolute; z-index: 5; inset: 0; min-height: 0; overflow: visible; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+.free-desk::after { display: none; }
+.empty-free-desk { left: 39%; right: 25%; top: 27%; bottom: 28%; opacity: .68; }
+.empty-free-desk span { font-size: 28px; }
+.empty-free-desk strong { padding: 8px 13px; border-radius: 99px; background: rgba(24,10,4,.3); }
+.empty-free-desk small { display: none; }
+
+.robot-station {
+  right: 7.2%;
+  bottom: 28%;
+  width: 15.5%;
+  min-width: 190px;
+  min-height: 22%;
+  border: 4px solid #5d4934;
+  border-radius: 22px 22px 13px 13px;
+  background: linear-gradient(135deg, #705b43, #211f1b 42%, #111a18 72%, #6d5335);
+  box-shadow: inset 0 0 0 2px #a48659, inset 0 -28px 30px #090c0b, 0 20px 28px rgba(0,0,0,.58);
+}
+.robot-station::before { content: ""; position: absolute; left: 13%; right: 13%; bottom: 12%; height: 24%; border: 3px solid #806543; border-radius: 2px 2px 11px 11px; background: #0b1210; box-shadow: inset 0 6px 10px #000; }
+.robot-station > span { position: relative; z-index: 2; width: 54%; height: auto; aspect-ratio: 1.5; border-radius: 9px; color: #e0bd65; background: radial-gradient(circle at 36% 52%, #d8ad53 0 5%, transparent 6%), radial-gradient(circle at 65% 52%, #d8ad53 0 5%, transparent 6%), #101b18; box-shadow: inset 0 0 12px #000; font-size: 0; }
+.robot-station > strong { position: relative; z-index: 2; padding: 5px 12px; border: 1px solid #8d6a35; border-radius: 4px; color: #e7c678; background: #33271b; font-size: 11px; }
+.robot-station > small { position: relative; z-index: 2; font-size: 9px; }
+
+.movable-ticket {
+  width: clamp(220px, 16vw, 315px);
+  aspect-ratio: 1.68;
+  display: block;
+  padding: 0;
+  overflow: visible;
+  border: 2px solid #d2ad62;
+  border-radius: 7px;
+  background-color: #d6c79b;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+  box-shadow: 0 15px 22px rgba(0,0,0,.55), 0 1px 0 rgba(255,255,255,.5) inset;
+}
+.movable-ticket-name, .movable-ticket > small, .drag-grip { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+.movable-ticket-scratch { position: absolute; right: 7px; bottom: 7px; min-height: 25px; padding: 4px 8px; border: 1px solid rgba(238,211,145,.72); border-radius: 99px; color: #f8e8b9; background: rgba(9,27,22,.82); box-shadow: 0 3px 7px rgba(0,0,0,.35); font-size: 9px; }
+.ticket-pin, .ticket-robot { top: -31px; min-height: 27px; opacity: 0; color: #f3dea6; border-color: #9b793e; background: rgba(7,31,24,.94); transition: opacity .15s, transform .15s; transform: translateY(5px); }
+.ticket-pin { right: 0; }
+.ticket-robot { right: 54px; }
+.movable-ticket:hover .ticket-pin, .movable-ticket:hover .ticket-robot, .movable-ticket:focus-within .ticket-pin, .movable-ticket:focus-within .ticket-robot { opacity: 1; transform: none; }
+.movable-ticket.card-lingqian-ticket { background-image: url('./assets/concepts/lingqian-ticket-play-v1.webp'); }
+.movable-ticket.card-street-store { background-image: url('./assets/concepts/jiejiao-store-ticket-concept-v1.webp'); }
+.movable-ticket.card-arcade-challenge { background-image: url('./assets/concepts/jieji-challenge-ticket-concept-v1.webp'); }
+.movable-ticket.card-gold-mine { background-image: url('./assets/concepts/golden-mine-ticket-concept-v1.webp'); }
+.movable-ticket.card-rocket-launch { background-image: url('./assets/concepts/rocket-launch-ticket-concept-v1.webp'); }
+.movable-ticket.card-deep-sea-salvage { background-image: url('./assets/concepts/deep-sea-salvage-ticket-concept-v1.webp'); }
+.movable-ticket.card-eternal-color-diamond { background-image: url('./assets/concepts/eternal-color-diamond-ticket-concept-v1.webp'); }
+.movable-ticket.card-all-in { background-image: url('./assets/concepts/all-in-ticket-concept-v2.webp'); }
+
+@media (max-width: 1100px) {
+  .topbar nav button { min-width: 82px; padding: 0 10px; font-size: 12px; }
+  .topbar nav button::before { margin-right: 5px; }
+  .catalog-dock { min-width: 245px; }
+  .fan-station { min-width: 104px; }
+  .robot-station { min-width: 160px; }
+}
+
+@media (max-width: 700px) {
+  .game-shell { min-height: 100dvh; }
+  .topbar { min-height: 62px; flex-wrap: nowrap; padding: 5px 10px; }
+  .identity { min-width: 0; }
+  .identity small { display: none; }
+  .identity strong { max-width: 152px; overflow: hidden; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
+  .avatar { width: 42px; height: 42px; }
+  .topbar nav { width: auto; max-width: none; height: 52px; margin: 0; }
+  .topbar nav button { display: none; }
+  .topbar nav button:first-child, .topbar nav button:nth-child(2), .topbar nav button:last-child { display: block; min-width: 48px; padding: 0 6px; font-size: 0; }
+  .topbar nav button::before { margin: 0; font-size: 24px; }
+  .desk { height: max(calc(100dvh - 62px), 178vw); min-height: 760px; background-image: url('./assets/desk-scene-mobile-v1.webp'); }
+  .catalog-dock { left: -4%; top: 15%; width: 35%; min-width: 0; height: 12%; border-radius: 0 13px 13px 0; }
+  .catalog-dock > strong { left: 16%; right: 16%; bottom: -7px; font-size: 10px; }
+  .catalog-dock > small { display: none; }
+  .catalog-panel { top: 70px; }
+  .catalog-scrim { top: 62px; }
+  .fan-station { left: 3%; top: 2.5%; width: 24%; min-width: 0; }
+  .redeem-drop-zone { left: 34%; top: 3.4%; width: 42%; height: 8%; min-height: 72px; }
+  .redeem-drop-zone span::before, .redeem-drop-zone span::after { margin: 0 7px; }
+  .trash-drop-zone { right: -5%; bottom: 3%; width: 25%; min-width: 100px; height: 17%; }
+  .fixed-slot-panel { left: -2%; bottom: 20%; width: 46%; min-height: 28%; padding: 13px; }
+  .fixed-slots { grid-template-columns: repeat(2, 1fr); max-height: 245px; overflow-y: auto; }
+  .fixed-slot { min-height: 58px; }
+  .slot-lock-copy { min-height: 170px; }
+  .robot-station { right: 2%; bottom: 24%; width: 30%; min-width: 0; min-height: 15%; }
+  .movable-ticket { width: min(58vw, 245px); }
+  .ticket-pin, .ticket-robot { top: -29px; opacity: 1; transform: none; }
+  .empty-free-desk { left: 25%; right: 10%; top: 33%; bottom: 42%; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }

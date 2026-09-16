@@ -30,6 +30,7 @@ export function App() {
   const [shopOpen, setShopOpen] = useState(false)
   const [shopFocus, setShopFocus] = useState<ShopItem['code']>('luck')
   const [shop, setShop] = useState<ShopStatus | null>(null)
+  const [catalogOpen, setCatalogOpen] = useState(false)
   const [robot, setRobot] = useState<RobotStatus | null>(null)
   const [robotOpen, setRobotOpen] = useState(false)
   const [fan, setFan] = useState<FanStatus | null>(null)
@@ -387,8 +388,8 @@ export function App() {
     const row = Math.floor(deskCount / 3) % 3
     void updateTicketPlacement(ticket, {
       location: 'desk',
-      deskX: .23 + column * .27,
-      deskY: .24 + row * .25,
+      deskX: .44 + column * .17,
+      deskY: .36 + row * .2,
       rotation: ((deskCount * 7) % 11) - 5,
       zIndex: Math.max(1, ...tickets.map((item) => item.zIndex)) + 1,
     })
@@ -647,7 +648,15 @@ export function App() {
       {notice && <div className="notice" role="status">{notice}</div>}
 
       <section className="desk">
-        <aside className="catalog-panel">
+        <button type="button" className="catalog-dock" onClick={() => setCatalogOpen(true)} aria-label={`打开购卡托盘，${trayTickets.length}张卡等待放置`}>
+          <span className="catalog-stack" aria-hidden="true"><i /><i /><i /></span>
+          <strong>购卡托盘</strong>
+          <small>{trayTickets.length ? `${trayTickets.length} 张待放置` : '选购刮刮卡'}</small>
+        </button>
+
+        {catalogOpen && <button type="button" className="catalog-scrim" onClick={() => setCatalogOpen(false)} aria-label="关闭购卡托盘" />}
+        {catalogOpen && <aside className="catalog-panel">
+          <button type="button" className="catalog-close" onClick={() => setCatalogOpen(false)} aria-label="关闭购卡托盘">×</button>
           <div className="panel-title"><span>购卡托盘</span><small>余额达到售价即可购买</small></div>
           <div className="tray-inventory" aria-label="等待放置的卡片">
             <div className="tray-heading"><strong>待放到桌面</strong><span>{trayTickets.length} 张</span></div>
@@ -689,7 +698,7 @@ export function App() {
               </button>
             ))}
           </div>
-        </aside>
+        </aside>}
 
         <section className="table-area" aria-labelledby="ticket-heading">
           <div className="table-heading">
