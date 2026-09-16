@@ -69,6 +69,8 @@ export function App() {
   const [discardingTicketId, setDiscardingTicketId] = useState<string | null>(null)
   const [redeemingTicketId, setRedeemingTicketId] = useState<string | null>(null)
   const [robotEjectedTicketId, setRobotEjectedTicketId] = useState<string | null>(null)
+  const [robotIntakeTicket, setRobotIntakeTicket] = useState<Ticket | null>(null)
+  const [robotOutputTicket, setRobotOutputTicket] = useState<Ticket | null>(null)
   const [coinBurst, setCoinBurst] = useState<{ key: number; reward: number } | null>(null)
   const [scratchProgress, setScratchProgress] = useState<Record<string, number>>(savedScratchProgress)
   const [trayDragging, setTrayDragging] = useState(false)
@@ -80,6 +82,8 @@ export function App() {
   const robotZoneRef = useRef<HTMLButtonElement>(null)
   const slotRefs = useRef<Array<HTMLDivElement | null>>([])
   const robotTickingRef = useRef(false)
+  const robotIntakeTimerRef = useRef<number | null>(null)
+  const robotOutputTimerRef = useRef<number | null>(null)
   const fanHoldTimerRef = useRef<number | null>(null)
 
   useEffect(() => {
@@ -101,8 +105,14 @@ export function App() {
         if (result.event) {
           const finished = result.event.ticket
           setTickets((current) => current.map((ticket) => ticket.id === finished.id ? finished : ticket))
+          setRobotOutputTicket(finished)
           setRobotEjectedTicketId(finished.id)
-          window.setTimeout(() => setRobotEjectedTicketId((current) => current === finished.id ? null : current), 1500)
+          if (robotOutputTimerRef.current !== null) window.clearTimeout(robotOutputTimerRef.current)
+          robotOutputTimerRef.current = window.setTimeout(() => {
+            setRobotOutputTicket((current) => current?.id === finished.id ? null : current)
+            setRobotEjectedTicketId((current) => current === finished.id ? null : current)
+            robotOutputTimerRef.current = null
+          }, 1900)
           setNotice(finished.reward
             ? `机器人吐出《${finished.cardName}》，中奖 ${coinFormatter.format(finished.reward)} 金币，请手动兑奖`
             : `机器人吐出《${finished.cardName}》，本张未中奖`)
@@ -156,9 +166,15 @@ export function App() {
       if (discardTimerRef.current !== null) window.clearTimeout(discardTimerRef.current)
       if (discardAnimationTimerRef.current !== null) window.clearTimeout(discardAnimationTimerRef.current)
       if (fanHoldTimerRef.current !== null) window.clearTimeout(fanHoldTimerRef.current)
+      if (robotIntakeTimerRef.current !== null) window.clearTimeout(robotIntakeTimerRef.current)
+      if (robotOutputTimerRef.current !== null) window.clearTimeout(robotOutputTimerRef.current)
       discardTimerRef.current = null
       discardAnimationTimerRef.current = null
+      robotIntakeTimerRef.current = null
+      robotOutputTimerRef.current = null
       setPendingDiscard(null)
+      setRobotIntakeTicket(null)
+      setRobotOutputTicket(null)
       await api.logout()
       setUser(null)
       setCards([])
@@ -538,8 +554,14 @@ export function App() {
       const result = await api.enqueueRobot(ticket.id)
       setRobot(result.robot)
       setTickets((current) => current.map((item) => item.id === ticket.id ? result.ticket : item))
+      setRobotIntakeTicket(ticket)
+      if (robotIntakeTimerRef.current !== null) window.clearTimeout(robotIntakeTimerRef.current)
+      robotIntakeTimerRef.current = window.setTimeout(() => {
+        setRobotIntakeTicket((current) => current?.id === ticket.id ? null : current)
+        robotIntakeTimerRef.current = null
+      }, 1250)
       setActiveTicket(null)
-      setNotice(`《${ticket.cardName}》已加入机器人队列`)
+      setNotice(`机器人正在吞入《${ticket.cardName}》，已加入刮奖队列`)
     } catch (error) {
       setNotice(messageFrom(error))
     }
@@ -871,10 +893,28 @@ export function App() {
           </section>
 
           <div className={`free-desk ${fanHolding ? 'fan-active' : ''} ${trayDragging ? 'tray-drop-ready' : ''}`} ref={deskRef} aria-label="可自由摆放刮刮乐的桌面">
+            {robotIntakeTicket && (
+              <div
+                className={`robot-intake-ticket card-${robotIntakeTicket.cardCode}`}
+                style={{
+                  left: `${robotIntakeTicket.deskX * 100}%`,
+                  top: `${robotIntakeTicket.deskY * 100}%`,
+                  '--robot-intake-x': `${(0.88 - robotIntakeTicket.deskX) * 100}vw`,
+                  '--robot-intake-y': `${(0.55 - robotIntakeTicket.deskY) * 100}vh`,
+                  '--robot-intake-x-mid': `${(0.88 - robotIntakeTicket.deskX) * 72}vw`,
+                  '--robot-intake-y-mid': `${(0.55 - robotIntakeTicket.deskY) * 72}vh`,
+                  '--ticket-rotation': `${robotIntakeTicket.rotation}deg`,
+                } as CSSProperties}
+                aria-hidden="true"
+              >
+                <img src={ticketArtworkFor(robotIntakeTicket.cardCode)} alt="" />
+                <TicketScratchCoating cardCode={robotIntakeTicket.cardCode} progress={scratchProgress[robotIntakeTicket.id] ?? 0} />
+              </div>
+            )}
             <button
               type="button"
               ref={robotZoneRef}
-              className={`robot-station ${user.robotOwned ? 'owned' : 'locked'} ${robotEjectedTicketId ? 'ejecting' : ''}`}
+              className={`robot-station ${user.robotOwned ? 'owned' : 'locked'} ${robot?.queue.length ? 'processing' : ''} ${robotIntakeTicket ? 'intaking' : ''} ${robotEjectedTicketId ? 'ejecting' : ''}`}
               onClick={() => user.robotOwned ? setRobotOpen(true) : void openShop('robot')}
             >
               <span className={robot?.queue.length ? 'working' : ''}>▣</span>
@@ -882,6 +922,12 @@ export function App() {
               <small>{user.robotOwned ? `${robot?.queue.length ?? 0} / ${robot?.capacity ?? 3} 张` : '购买 · 1,000金币'}</small>
               {robot?.queue[0] && <i style={{ width: `${Math.max(3, 100 - robot.queue[0].remainingMs / ((robot.durationSeconds || 1) * 10))}%` }} />}
             </button>
+            {robotOutputTicket && (
+              <div className={`robot-output-ticket card-${robotOutputTicket.cardCode}`} aria-hidden="true">
+                <img src={ticketArtworkFor(robotOutputTicket.cardCode)} alt="" />
+                <TicketResultSurface ticket={robotOutputTicket} compact />
+              </div>
+            )}
             {deskTickets.length === 0 && (
               <div className="empty-free-desk"><span>✦</span><strong>桌面暂无刮刮乐</strong><small>打开商店购买后会直接放到桌面</small></div>
             )}

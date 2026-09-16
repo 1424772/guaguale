@@ -71,7 +71,7 @@ export function TicketSymbolGlyph({ cardCode, symbol }: { cardCode: string; symb
   const baseSymbol = symbol.replace(/^目标·/, '')
   const artwork = symbolArtworkFor(cardCode, baseSymbol)
   if (artwork) {
-    return <span className={`ticket-symbol-glyph ticket-symbol-glyph-artwork art-card-${cardCode}`} style={{ backgroundImage: `url(${artwork})` }} aria-hidden="true" />
+    return <span className={`ticket-symbol-glyph ticket-symbol-glyph-artwork art-card-${cardCode}`} aria-hidden="true"><img src={artwork} alt="" draggable={false} loading="eager" decoding="sync" /></span>
   }
   const fuelValue = symbol.match(/^燃料 (\d)$/)?.[1]
   if (fuelValue) return <span className={`ticket-symbol-glyph ticket-fuel-glyph fuel-${fuelValue}`} aria-hidden="true"><b>⚡</b><em>{fuelValue}</em></span>
@@ -312,7 +312,10 @@ export function ScratchCard({ cardCode, cardName, symbols, scratchLevel, prizeTi
       totalTransparent += transparent
       totalSampled += indexes.length
       const cellProgress = indexes.length ? (transparent / indexes.length) * 100 : 0
-      if (cellProgress >= revealThreshold && !revealedRef.current.has(cellIndex)) {
+      // The prize artwork exists below the coating from the first frame. Mark the
+      // cell as revealed after the first meaningful scratch so its entrance
+      // effect never waits for the whole ticket to complete.
+      if (cellProgress >= 4 && !revealedRef.current.has(cellIndex)) {
         revealedRef.current.add(cellIndex)
         newlyRevealed.push(cellIndex)
       }
@@ -342,7 +345,7 @@ export function ScratchCard({ cardCode, cardName, symbols, scratchLevel, prizeTi
           <strong>{cardCode === 'eternal-color-diamond' ? '五项彩钻鉴定' : cardCode === 'all-in' ? '唯一终局刮层' : `${symbols.length} 格刮奖区域`}</strong>
         </div>
       <div className="scratch-stage" style={{ aspectRatio: `720 / ${stageHeight}` }}>
-        <div className="symbols" aria-hidden={!complete} style={{ display: 'block' }}>
+        <div className="symbols" aria-label={`${cardName}刮奖结果`} style={{ display: 'block' }}>
           {symbols.map((symbol, index) => {
             const visual = getSymbolVisual(symbol)
             const revealed = revealedIndexes.includes(index)
