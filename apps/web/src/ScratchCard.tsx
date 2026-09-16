@@ -71,7 +71,7 @@ export function TicketSymbolGlyph({ cardCode, symbol }: { cardCode: string; symb
   const baseSymbol = symbol.replace(/^目标·/, '')
   const artwork = symbolArtworkFor(cardCode, baseSymbol)
   if (artwork) {
-    return <span className={`ticket-symbol-glyph ticket-symbol-glyph-artwork art-card-${cardCode}`} aria-hidden="true"><img src={artwork} alt="" draggable={false} loading="eager" decoding="sync" /></span>
+    return <span className={`ticket-symbol-glyph ticket-symbol-glyph-artwork art-card-${cardCode}`} data-symbol={baseSymbol} aria-hidden="true"><img src={artwork} alt="" draggable={false} loading="eager" decoding="sync" /></span>
   }
   const fuelValue = symbol.match(/^燃料 (\d)$/)?.[1]
   if (fuelValue) return <span className={`ticket-symbol-glyph ticket-fuel-glyph fuel-${fuelValue}`} aria-hidden="true"><b>⚡</b><em>{fuelValue}</em></span>
