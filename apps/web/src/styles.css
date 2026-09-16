@@ -372,7 +372,7 @@ button { color: inherit; }
 .ticket-heading strong { font-size: 13px; }
 .scratch-stage { position: relative; overflow: hidden; aspect-ratio: 720 / 220; border: 5px solid #e1d6aa; border-radius: 0 0 9px 9px; background: #bdc79c; }
 .symbols { position: absolute; inset: 0; display: grid; grid-template-columns: repeat(3, 1fr); }
-.symbol { display: grid; place-content: center; justify-items: center; gap: 3px; border-right: 1px dashed rgba(32,62,45,.25); }
+.symbol { position: relative; display: grid; place-content: center; justify-items: center; gap: 3px; border-right: 1px dashed rgba(32,62,45,.25); }
 .symbol:last-child { border: 0; }
 .symbol span { font-size: clamp(35px, 7vw, 70px); }
 .symbol small { color: #254632; font-weight: 800; }
@@ -380,6 +380,78 @@ button { color: inherit; }
 .scratch-progress { height: 5px; overflow: hidden; border-radius: 99px; background: rgba(255,255,255,.08); }
 .scratch-progress span { display: block; height: 100%; border-radius: inherit; background: #dab353; transition: width .18s; }
 .scratch-card > p { margin: 0; color: #9c9a88; font-size: 13px; text-align: center; }
+.symbol.revealed span { animation: symbol-reveal .22s cubic-bezier(.2,.85,.35,1.15) both; }
+.symbol.revealed small { animation: label-reveal .2s ease both; }
+@keyframes symbol-reveal { from { opacity: .25; transform: translateY(5px) scale(.9); filter: blur(2px); } to { opacity: 1; transform: none; filter: none; } }
+@keyframes label-reveal { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+/* 01 · 零钱小票：旧纸、油墨、印章反馈。 */
+.scratch-card-lingqian-ticket .ticket-heading, .result-ticket-lingqian-ticket { color: #294d38; background: linear-gradient(102deg, #eee2b9, #d6c990 58%, #eee0b3); }
+.scratch-card-lingqian-ticket .scratch-stage, .result-ticket-lingqian-ticket { border-color: #cab877; background: repeating-linear-gradient(0deg, rgba(78,91,55,.035) 0 1px, transparent 1px 5px), #e9dfb9; }
+.scratch-card-lingqian-ticket .symbol { border-color: rgba(48,91,58,.25); }
+.scratch-card-lingqian-ticket .symbol span, .result-ticket-lingqian-ticket strong { filter: saturate(.8) sepia(.12); }
+.scratch-card-lingqian-ticket.is-complete .winning-symbol, .result-ticket-lingqian-ticket .winning-symbol { outline: 3px double #497a52; outline-offset: -8px; animation: receipt-stamp .42s cubic-bezier(.15,.85,.3,1.1) both; }
+.scratch-card-lingqian-ticket.is-complete.is-triple .scratch-stage::after, .result-ticket-lingqian-ticket.is-triple::after { content: "×2"; position: absolute; z-index: 3; right: 5%; top: 7%; padding: 4px 9px; border: 3px solid #a23d32; border-radius: 5px; color: #a23d32; font: 900 24px/1 Georgia, serif; transform: rotate(-8deg); animation: receipt-stamp .58s cubic-bezier(.15,.85,.3,1.1) both; pointer-events: none; }
+.result-ticket-lingqian-ticket { position: relative; }
+@keyframes receipt-stamp { from { opacity: 0; transform: scale(1.22) rotate(-5deg); } to { opacity: 1; transform: scale(1) rotate(-1deg); } }
+
+/* 02 · 街角杂货铺：货架弹出与促销章。 */
+.scratch-card-street-store .ticket-heading, .result-ticket-street-store { color: #71391f; background: linear-gradient(110deg, #f4d582, #efaa62 54%, #d86743); }
+.scratch-card-street-store .scratch-stage, .result-ticket-street-store { border-color: #d59455; background: repeating-linear-gradient(0deg, #d5a66c 0 5px, #c8965d 6px 8px, #f0d298 9px 12px); }
+.scratch-card-street-store .symbol { margin: 6px; border: 2px solid rgba(105,56,31,.34); border-radius: 8px; background: rgba(255,239,191,.82); box-shadow: inset 0 -10px rgba(116,63,32,.1); }
+.scratch-card-street-store .symbol.revealed span { animation-name: shelf-pop; }
+.scratch-card-street-store.is-complete .winning-symbol, .result-ticket-street-store .winning-symbol { border-color: #b6402f; box-shadow: inset 0 0 0 3px #ffd474, 0 0 12px rgba(169,47,34,.35); }
+.scratch-card-street-store.is-complete .winning-symbol::after { content: "促销"; position: absolute; align-self: start; justify-self: end; margin: 7px; padding: 3px 5px; border-radius: 50%; color: #fff4c9; background: #b44030; font-size: 9px; font-weight: 900; transform: rotate(9deg); animation: receipt-stamp .35s both; }
+.scratch-card-street-store.is-complete .symbol[aria-label="游戏机"] span, .result-ticket-street-store .winning-symbol[aria-label="游戏机"] { animation: pixel-electric .65s steps(4) 2; }
+@keyframes shelf-pop { from { opacity: .2; transform: translateY(10px) scale(.86); } 65% { transform: translateY(-4px) scale(1.06); } to { opacity: 1; transform: none; } }
+@keyframes pixel-electric { 50% { filter: brightness(1.35) drop-shadow(0 0 9px #fff06b); transform: scale(1.08); } }
+
+/* 03 · 街机挑战券：CRT 扫描线与胜利行追光。 */
+.scratch-card-arcade-challenge .ticket-heading, .result-ticket-arcade-challenge { color: #c9fff2; background: linear-gradient(105deg, #3b2062, #151c42 56%, #133a42); }
+.scratch-card-arcade-challenge .scratch-stage, .result-ticket-arcade-challenge { border-color: #745ca4; background: radial-gradient(circle at 50% 45%, #24346d, #0b112b 70%); }
+.scratch-card-arcade-challenge .scratch-stage::after, .result-ticket-arcade-challenge::after { content: ""; position: absolute; z-index: 2; inset: 0; background: repeating-linear-gradient(0deg, transparent 0 4px, rgba(0,0,0,.16) 5px 6px); pointer-events: none; }
+.scratch-card-arcade-challenge .symbol, .result-ticket-arcade-challenge strong { border-color: rgba(95,224,212,.2); color: #dcfff9; text-shadow: 2px 2px #593398; }
+.scratch-card-arcade-challenge .symbol.revealed span { animation: arcade-pixel-in .28s steps(4) both; }
+.scratch-card-arcade-challenge.is-complete .winning-row, .result-ticket-arcade-challenge .winning-row { background: rgba(66,231,198,.14); box-shadow: inset 0 0 0 2px #62e4cf, 0 0 16px rgba(70,228,207,.3); animation: row-chase .75s ease 2; }
+.scratch-card-arcade-challenge.is-complete .winning-row[aria-label="街机皇冠"] span, .result-ticket-arcade-challenge .winning-row[aria-label="街机皇冠"] { filter: drop-shadow(0 0 13px #ffe069); }
+.result-ticket-arcade-challenge { position: relative; overflow: hidden; color: #ddfff7; }
+@keyframes arcade-pixel-in { from { opacity: 0; transform: scale(.72); filter: contrast(2); } to { opacity: 1; transform: scale(1); } }
+@keyframes row-chase { 50% { filter: brightness(1.45); transform: translateX(2px); } }
+
+/* 04 · 黄金矿洞：岩壁碎裂、目标晶簇和命中矿点。 */
+.scratch-card-gold-mine .ticket-heading, .result-ticket-gold-mine { color: #f6d88b; background: linear-gradient(110deg, #4d3928, #251d1b 58%, #72532b); }
+.scratch-card-gold-mine .scratch-stage, .result-ticket-gold-mine { border-color: #826537; background: radial-gradient(circle at 68% 20%, rgba(220,170,72,.2), transparent 22%), linear-gradient(135deg, #302925, #171818 66%, #3b2b20); }
+.scratch-card-gold-mine .symbol, .result-ticket-gold-mine strong { border-color: rgba(228,187,91,.24); color: #f4dc9f; background: radial-gradient(circle, rgba(187,140,54,.1), transparent 65%); }
+.scratch-card-gold-mine .symbol.revealed span { animation: ore-chip .32s cubic-bezier(.2,.8,.3,1.2) both; }
+.scratch-card-gold-mine .target-symbol, .result-ticket-gold-mine .target-symbol { outline: 2px solid #e0a83c; outline-offset: -7px; background: rgba(171,114,35,.23); }
+.scratch-card-gold-mine.is-complete .target-match, .result-ticket-gold-mine .target-match { box-shadow: inset 0 0 0 3px #e3b84f, 0 0 17px rgba(238,193,77,.38); animation: mine-hit .5s ease both; }
+@keyframes ore-chip { from { opacity: .2; transform: scale(.65) rotate(-9deg); } 65% { transform: scale(1.08) rotate(2deg); } to { opacity: 1; transform: none; } }
+@keyframes mine-hit { 50% { filter: brightness(1.45); transform: translateY(-3px); } }
+
+/* 05 · 火箭发射：燃料翻牌，最终按档位点火。 */
+.scratch-card-rocket-launch .ticket-heading, .result-ticket-rocket-launch { color: #d9f6ff; background: linear-gradient(110deg, #223952, #101c31 62%, #5c2e25); }
+.scratch-card-rocket-launch .scratch-stage, .result-ticket-rocket-launch { border-color: #607c92; background: radial-gradient(circle at 13% 22%, #fff 0 1px, transparent 2px), radial-gradient(circle at 70% 38%, #fff 0 1px, transparent 2px), linear-gradient(#08172c, #17354a); background-size: 77px 61px, 113px 89px, auto; }
+.scratch-card-rocket-launch .symbol, .result-ticket-rocket-launch strong { border-color: rgba(132,200,220,.28); color: #d9f7ff; background: linear-gradient(145deg, rgba(20,55,75,.74), rgba(4,21,36,.8)); }
+.scratch-card-rocket-launch .symbol.revealed span { animation: fuel-flip .42s cubic-bezier(.2,.75,.25,1) both; }
+.scratch-card-rocket-launch.is-complete .scratch-stage::after, .result-ticket-rocket-launch::after { content: "🚀"; position: absolute; z-index: 3; right: 5%; bottom: 4%; font-size: 38px; filter: drop-shadow(0 12px 9px #ff8739); animation: rocket-lift 1s ease-out both; pointer-events: none; }
+.scratch-card-rocket-launch.tier-none.is-complete .scratch-stage::after, .result-ticket-rocket-launch.tier-none::after { animation-name: rocket-fizzle; }
+.result-ticket-rocket-launch { position: relative; overflow: hidden; }
+@keyframes fuel-flip { from { opacity: .15; transform: perspective(200px) rotateY(90deg); } to { opacity: 1; transform: perspective(200px) rotateY(0); } }
+@keyframes rocket-lift { from { opacity: .3; transform: translateY(28px) rotate(-4deg); } to { opacity: 1; transform: translateY(-18px) rotate(3deg); } }
+@keyframes rocket-fizzle { 50% { transform: translateY(-4px) rotate(-5deg); } to { opacity: .58; transform: translateY(2px) rotate(3deg); filter: grayscale(.6); } }
+
+/* 06 · 深海打捞：水波、气泡与最高价值物聚光。 */
+.scratch-card-deep-sea-salvage .ticket-heading, .result-ticket-deep-sea-salvage { color: #d6fff6; background: linear-gradient(110deg, #12636b, #073b50 60%, #102d49); }
+.scratch-card-deep-sea-salvage .scratch-stage, .result-ticket-deep-sea-salvage { border-color: #3f8b91; background: radial-gradient(ellipse at 20% 0, rgba(126,244,223,.22), transparent 35%), linear-gradient(#07516a, #063349 58%, #061e33); }
+.scratch-card-deep-sea-salvage .scratch-stage::after { content: ""; position: absolute; z-index: 2; left: -25%; top: -60%; width: 150%; height: 90%; background: repeating-radial-gradient(ellipse at center, transparent 0 28px, rgba(141,255,232,.09) 31px 35px); animation: sea-caustics 5s linear infinite; pointer-events: none; }
+.scratch-card-deep-sea-salvage .symbol, .result-ticket-deep-sea-salvage strong { border-color: rgba(105,222,210,.22); color: #d4fff5; }
+.scratch-card-deep-sea-salvage .symbol.revealed span { animation: salvage-rise .42s ease-out both; }
+.scratch-card-deep-sea-salvage.is-complete .highest-value, .result-ticket-deep-sea-salvage .highest-value { background: radial-gradient(circle, rgba(251,222,119,.3), transparent 69%); box-shadow: inset 0 0 0 2px rgba(250,218,111,.74), 0 0 22px rgba(237,214,116,.32); animation: salvage-spotlight 1.2s ease-in-out 2; }
+.result-ticket-deep-sea-salvage { color: #d6fff7; }
+@keyframes salvage-rise { from { opacity: .18; transform: translateY(14px) rotate(-5deg); } 70% { transform: translateY(-3px) rotate(1deg); } to { opacity: 1; transform: none; } }
+@keyframes sea-caustics { to { transform: translate3d(12%, 16%, 0) rotate(4deg); } }
+@keyframes salvage-spotlight { 50% { filter: brightness(1.32); transform: translateY(-3px) scale(1.035); } }
+
 .scratch-card-eternal-color-diamond .ticket-heading { color: #39405e; background: linear-gradient(120deg, #f8eaff, #dff5ff 36%, #fff 62%, #f4dfec); }
 .scratch-card-eternal-color-diamond .scratch-stage { border-color: #eadfff; background: radial-gradient(circle at 50% 5%, rgba(255,255,255,.95), transparent 28%), linear-gradient(130deg, #eadcff, #d7efff 36%, #fff 60%, #f1d9e9); box-shadow: inset 0 0 34px rgba(157,187,239,.32), 0 0 30px rgba(205,189,255,.18); }
 .scratch-card-eternal-color-diamond .symbol { position: relative; border-right-color: rgba(91,92,137,.2); }
@@ -394,13 +466,15 @@ button { color: inherit; }
 .symbol-collection span, .result-ticket .symbol-collection { color: #cf8cbd; }
 .symbol-royal span, .result-ticket .symbol-royal { color: #d2a847; }
 .symbol-eternal span, .result-ticket .symbol-eternal { color: #8469d8; animation: diamond-eternal 1.8s ease-in-out infinite; }
+.scratch-card-eternal-color-diamond.is-complete .lowest-grade, .result-ticket-eternal-color-diamond .lowest-grade { outline: 2px solid rgba(121,101,178,.7); outline-offset: -8px; background: rgba(119,91,174,.1); }
 @keyframes diamond-breathe { 50% { transform: translateY(-2px) scale(1.045); filter: brightness(1.16); } }
 @keyframes diamond-eternal { 50% { transform: scale(1.12) rotate(2deg); text-shadow: 0 0 8px #fff, 0 0 20px #8bdcff, 0 0 30px #eaaeff; } }
 .scratch-card-all-in .ticket-heading { color: #eee3ce; background: linear-gradient(110deg, #493526, #151315 58%, #4c2023); }
 .scratch-card-all-in .scratch-stage { border-color: #7a5a38; background: radial-gradient(circle at center, #4b171b 0, #171113 39%, #060708 72%); box-shadow: inset 0 0 70px #000, 0 0 28px rgba(126,31,34,.22); }
 .scratch-card-all-in .symbols { place-items: center; }
 .scratch-card-all-in .symbol { width: 230px; height: 230px; border: 1px solid rgba(179,131,76,.38); border-radius: 50%; background: radial-gradient(circle, rgba(131,41,43,.3), rgba(0,0,0,.55)); }
-.scratch-card-all-in .symbol span { font-size: 96px; animation: all-in-reveal .72s cubic-bezier(.17,.84,.35,1) both; }
+.scratch-card-all-in .symbol span { font-size: 96px; }
+.scratch-card-all-in .symbol.revealed span { animation: all-in-reveal .72s cubic-bezier(.17,.84,.35,1) both; }
 .scratch-card-all-in .symbol small { color: #d5c3a4; letter-spacing: .18em; }
 .scratch-card-all-in .symbol-skull span { filter: grayscale(1); text-shadow: 0 0 22px rgba(255,255,255,.28); }
 .scratch-card-all-in .symbol-scythe span { text-shadow: 0 0 22px rgba(211,164,84,.6); }
@@ -413,6 +487,16 @@ button { color: inherit; }
 .result-box h2 { margin: 7px 0; font-family: Georgia, "Songti SC", serif; font-size: 30px; }
 .result-box p { color: #b7b19d; }
 .result-box.winner h2 { color: #f1ce6e; }
+.result-box { animation: result-rise .38s ease-out both; }
+.result-box.winner h2 { animation: result-number .48s cubic-bezier(.2,.82,.3,1.15) both; }
+.card-result-eternal-color-diamond.winner { box-shadow: inset 0 0 24px rgba(164,187,255,.1), 0 0 24px rgba(198,174,255,.1); }
+.card-result-all-in { position: relative; overflow: hidden; }
+.card-result-all-in.tier-skull { border-color: rgba(142,73,66,.42); filter: saturate(.72); }
+.card-result-all-in.tier-scythe::after { content: ""; position: absolute; inset: -40% 45%; width: 3px; background: linear-gradient(transparent, #e6c178, transparent); transform: rotate(52deg); animation: scythe-slash .62s ease-out both; }
+.card-result-all-in.tier-angel { border-color: rgba(244,218,136,.7); box-shadow: 0 0 35px rgba(245,218,131,.22), inset 0 0 28px rgba(255,244,194,.1); }
+@keyframes result-rise { from { opacity: 0; transform: translateY(9px); } to { opacity: 1; transform: none; } }
+@keyframes result-number { from { opacity: 0; transform: scale(.88); } to { opacity: 1; transform: scale(1); } }
+@keyframes scythe-slash { from { opacity: 0; transform: translate(-180px, 100px) rotate(52deg); } 45% { opacity: 1; } to { opacity: 0; transform: translate(180px, -100px) rotate(52deg); } }
 .result-box .gold-button { width: min(100%, 360px); }
 .redeemed-badge { display: inline-block; padding: 9px 15px; border-radius: 999px; color: #b4d4bd; background: rgba(78,140,96,.24); }
 .result-ticket { padding: 20px; border: 5px solid #e1d6aa; border-radius: 9px; color: #1f3a2c; background: #bdc79c; }
