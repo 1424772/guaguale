@@ -73,6 +73,7 @@ func New(service *service.Service, store store.Store, logger *slog.Logger, cooki
 	mux.Handle("GET /api/v1/shop", api.requireUser(http.HandlerFunc(api.shop)))
 	mux.Handle("POST /api/v1/shop/{code}/upgrade", api.requireUser(http.HandlerFunc(api.upgradeItem)))
 	mux.Handle("GET /api/v1/tickets", api.requireUser(http.HandlerFunc(api.tickets)))
+	mux.Handle("POST /api/v1/tickets/{id}/reveal", api.requireUser(http.HandlerFunc(api.revealTicket)))
 	mux.Handle("POST /api/v1/tickets/{id}/scratch", api.requireUser(http.HandlerFunc(api.scratch)))
 	mux.Handle("POST /api/v1/tickets/{id}/redeem", api.requireUser(http.HandlerFunc(api.redeem)))
 	mux.Handle("PATCH /api/v1/tickets/{id}/placement", api.requireUser(http.HandlerFunc(api.placeTicket)))
@@ -219,6 +220,15 @@ func (api *API) tickets(response http.ResponseWriter, request *http.Request) {
 		return
 	}
 	writeJSON(response, http.StatusOK, map[string]any{"tickets": tickets})
+}
+
+func (api *API) revealTicket(response http.ResponseWriter, request *http.Request) {
+	ticket, err := api.service.Reveal(request.Context(), currentUser(request).ID, request.PathValue("id"))
+	if err != nil {
+		api.writeError(response, request, err)
+		return
+	}
+	writeJSON(response, http.StatusOK, map[string]any{"ticket": ticket})
 }
 
 func (api *API) scratch(response http.ResponseWriter, request *http.Request) {

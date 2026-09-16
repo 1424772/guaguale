@@ -284,6 +284,9 @@ export const api = {
     method: 'POST',
     headers: { 'Idempotency-Key': idempotencyKey },
   }),
+  revealTicket: (ticketId: string) => request<{ ticket: Ticket }>(`/api/v1/tickets/${ticketId}/reveal`, {
+    method: 'POST',
+  }),
   scratch: (ticketId: string) => request<{ ticket: Ticket }>(`/api/v1/tickets/${ticketId}/scratch`, {
     method: 'POST',
   }),

@@ -479,6 +479,13 @@ func (service *Service) Tickets(ctx context.Context, userID uint64) ([]domain.Ti
 	return service.store.ListTickets(ctx, userID)
 }
 
+func (service *Service) Reveal(ctx context.Context, userID uint64, ticketID string) (domain.Ticket, error) {
+	if !validTicketID(ticketID) {
+		return domain.Ticket{}, ErrInvalidInput
+	}
+	return service.store.RevealTicket(ctx, userID, ticketID)
+}
+
 func (service *Service) Scratch(ctx context.Context, userID uint64, ticketID string) (domain.Ticket, error) {
 	if !validTicketID(ticketID) {
 		return domain.Ticket{}, ErrInvalidInput

@@ -102,6 +102,7 @@ type Store interface {
 	DeleteSession(context.Context, [32]byte) error
 	PurchaseTicket(context.Context, CreateTicketInput) (domain.User, domain.Ticket, bool, error)
 	ListTickets(context.Context, uint64) ([]domain.Ticket, error)
+	RevealTicket(context.Context, uint64, string) (domain.Ticket, error)
 	ScratchTicket(context.Context, uint64, string) (domain.Ticket, error)
 	RedeemTicket(context.Context, uint64, string) (domain.User, domain.Ticket, bool, error)
 	UpdateTicketPlacement(context.Context, uint64, string, TicketPlacement) (domain.Ticket, error)

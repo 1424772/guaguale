@@ -409,6 +409,22 @@ func (store *Store) ListTickets(_ context.Context, userID uint64) ([]domain.Tick
 	return result, nil
 }
 
+func (store *Store) RevealTicket(_ context.Context, userID uint64, ticketID string) (domain.Ticket, error) {
+	store.mu.Lock()
+	defer store.mu.Unlock()
+	ticket, exists := store.tickets[ticketID]
+	if !exists || ticket.UserID != userID {
+		return domain.Ticket{}, basestore.ErrNotFound
+	}
+	if ticket.Location == domain.TicketInRobot {
+		return domain.Ticket{}, basestore.ErrRobotManaged
+	}
+	if ticket.State != domain.TicketPurchased && ticket.State != domain.TicketScratched {
+		return domain.Ticket{}, basestore.ErrInvalidState
+	}
+	return revealTicket(ticket), nil
+}
+
 func (store *Store) ScratchTicket(_ context.Context, userID uint64, ticketID string) (domain.Ticket, error) {
 	store.mu.Lock()
 	defer store.mu.Unlock()

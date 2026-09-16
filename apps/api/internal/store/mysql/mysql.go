@@ -218,6 +218,28 @@ func (store *Store) ListTickets(ctx context.Context, userID uint64) ([]domain.Ti
 	return result, rows.Err()
 }
 
+func (store *Store) RevealTicket(ctx context.Context, userID uint64, ticketID string) (domain.Ticket, error) {
+	ticket, err := scanTicket(store.db.QueryRowContext(ctx, `
+		SELECT id, user_id, card_code, card_name, source, purchase_key, price, price_paid,
+			COALESCE(DATE_FORMAT(wheel_date, '%Y-%m-%d'), ''), luck_level,
+			prize_tier, reward, symbols, state, location, desk_x, desk_y, rotation, z_index, slot_index,
+			created_at, COALESCE(scratch_source, ''), scratched_at, redeemed_at, discarded_at
+		FROM tickets WHERE id = ? AND user_id = ?`, ticketID, userID))
+	if errors.Is(err, sql.ErrNoRows) {
+		return domain.Ticket{}, basestore.ErrNotFound
+	}
+	if err != nil {
+		return domain.Ticket{}, err
+	}
+	if ticket.Location == domain.TicketInRobot {
+		return domain.Ticket{}, basestore.ErrRobotManaged
+	}
+	if ticket.State != domain.TicketPurchased && ticket.State != domain.TicketScratched {
+		return domain.Ticket{}, basestore.ErrInvalidState
+	}
+	return revealTicket(ticket), nil
+}
+
 func (store *Store) ScratchTicket(ctx context.Context, userID uint64, ticketID string) (domain.Ticket, error) {
 	tx, err := store.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
 	if err != nil {

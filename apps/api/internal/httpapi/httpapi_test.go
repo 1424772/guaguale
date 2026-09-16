@@ -76,6 +76,15 @@ func TestRegisterRequiresAgeConfirmationAndPurchaseIsIdempotent(t *testing.T) {
 		t.Fatalf("purchase retry was not idempotent: %#v", second)
 	}
 
+	reveal := postJSON(t, handler, "/api/v1/tickets/"+first.Ticket.ID+"/reveal", nil, cookies[0], "")
+	if reveal.Code != http.StatusOK || !bytes.Contains(reveal.Body.Bytes(), []byte(`"state":"purchased"`)) || !bytes.Contains(reveal.Body.Bytes(), []byte(`"symbols"`)) {
+		t.Fatalf("ticket reveal should expose the fixed outcome without completing the scratch: %d %s", reveal.Code, reveal.Body.String())
+	}
+	tickets := getJSON(t, handler, "/api/v1/tickets", cookies[0])
+	if tickets.Code != http.StatusOK || !bytes.Contains(tickets.Body.Bytes(), []byte(`"state":"purchased"`)) || bytes.Contains(tickets.Body.Bytes(), []byte(`"symbols"`)) {
+		t.Fatalf("revealing a ticket changed its state or leaked the outcome in listings: %d %s", tickets.Code, tickets.Body.String())
+	}
+
 	leaderboard := getJSON(t, handler, "/api/v1/leaderboard", cookies[0])
 	if leaderboard.Code != http.StatusOK || bytes.Contains(leaderboard.Body.Bytes(), []byte("接口玩家")) || bytes.Contains(leaderboard.Body.Bytes(), []byte("userId")) {
 		t.Fatalf("leaderboard leaked private identity: %d %s", leaderboard.Code, leaderboard.Body.String())

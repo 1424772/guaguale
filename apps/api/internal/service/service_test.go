@@ -56,6 +56,21 @@ func TestAccountAndTicketLifecycle(t *testing.T) {
 		t.Fatalf("purchase retry was not idempotent: %#v", retry)
 	}
 
+	revealed, err := service.Reveal(ctx, authResult.User.ID, purchase.Ticket.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if revealed.State != domain.TicketPurchased || len(revealed.Symbols) != 3 {
+		t.Fatalf("preview should reveal symbols without scratching ticket: %#v", revealed)
+	}
+	listed, err := service.Tickets(ctx, authResult.User.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(listed) != 1 || listed[0].State != domain.TicketPurchased || len(listed[0].Symbols) != 0 {
+		t.Fatalf("preview changed public ticket state or leaked symbols: %#v", listed)
+	}
+
 	scratched, err := service.Scratch(ctx, authResult.User.ID, purchase.Ticket.ID)
 	if err != nil {
 		t.Fatal(err)

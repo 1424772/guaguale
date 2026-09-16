@@ -7,6 +7,7 @@ import { PlateCleaning } from './PlateCleaning'
 import { getSymbolVisual, ScratchCard, symbolClassName, symbolStateClassNames, TicketSymbolGlyph } from './ScratchCard'
 import { ShopDialog } from './ShopDialog'
 import { RobotDialog } from './RobotDialog'
+import { TicketScratchCoating } from './TicketScratchCoating'
 import { ticketArtworkFor } from './ticketArtwork'
 
 const coinFormatter = new Intl.NumberFormat('zh-CN')
@@ -352,11 +353,27 @@ export function App() {
     }
     setBusy(true)
     try {
-      const response = await api.scratch(ticket.id)
-      setTickets((current) => current.map((item) => item.id === response.ticket.id ? response.ticket : item))
+      const response = await api.revealTicket(ticket.id)
       setActiveTicket(response.ticket)
       setScratchRequired(true)
       setScratchComplete(false)
+    } catch (error) {
+      setNotice(messageFrom(error))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function completeScratch(ticketId: string) {
+    if (busy) return
+    setBusy(true)
+    try {
+      const response = await api.scratch(ticketId)
+      setTickets((current) => current.map((item) => item.id === response.ticket.id ? response.ticket : item))
+      setActiveTicket((current) => current?.id === response.ticket.id ? response.ticket : current)
+      rememberScratchProgress(ticketId, 100)
+      setScratchRequired(false)
+      setScratchComplete(true)
     } catch (error) {
       setNotice(messageFrom(error))
     } finally {
@@ -749,7 +766,7 @@ export function App() {
               <div className="tray-stack">
                 {trayTickets.slice(0, 8).map((ticket) => (
                   <button type="button" key={ticket.id} draggable onDragStart={() => setTrayDragging(true)} onDragEnd={(event) => dragTrayTicketToDesk(ticket, event)} onClick={() => { sendToDesk(ticket); setCatalogOpen(false) }} disabled={busy}>
-                    <img src={ticketArtworkFor(ticket.cardCode)} alt="" /><span>{ticket.cardName}</span><small>{ticket.source === 'daily_wheel' ? '免费刮刮乐' : `${ticket.nominalPrice} 金币`}</small><strong>拖出或点击放置</strong>
+                    <span className={`tray-ticket-face card-${ticket.cardCode}`}><img src={ticketArtworkFor(ticket.cardCode)} alt="" /><TicketScratchCoating cardCode={ticket.cardCode} /></span><span>{ticket.cardName}</span><small>{ticket.source === 'daily_wheel' ? '免费刮刮乐' : `${ticket.nominalPrice} 金币`}</small><strong>拖出或点击放置</strong>
                   </button>
                 ))}
                 {trayTickets.length > 8 && <small>还有 {trayTickets.length - 8} 张等待放置</small>}
@@ -758,7 +775,7 @@ export function App() {
           </div>
           {firstCard && (
             <article className="featured-card">
-              <img src={ticketArtworkFor(firstCard.code)} alt="零钱小票刮刮乐票面" />
+              <span className={`featured-ticket-face card-${firstCard.code}`}><img src={ticketArtworkFor(firstCard.code)} alt="零钱小票刮刮乐票面" /><TicketScratchCoating cardCode={firstCard.code} /></span>
               <div className="featured-copy">
                 <div><span className="tag">已开放</span><h2>{firstCard.name}</h2></div>
                 <p>三格中出现两格相同即可获得对应奖励，三格相同奖励翻倍。</p>
@@ -778,7 +795,7 @@ export function App() {
             {cards.filter((card) => card.code !== 'lingqian-ticket').map((card, index) => (
               <button className="tier-row" key={card.code} type="button" disabled={!card.implemented || !card.unlocked || busy} onClick={() => purchase(card)}>
                 <span className="tier-number">{index + 2}</span>
-                <img src={ticketArtworkFor(card.code)} alt="" />
+                <span className={`tier-ticket-face card-${card.code}`}><img src={ticketArtworkFor(card.code)} alt="" /><TicketScratchCoating cardCode={card.code} /></span>
                 <div><strong>{card.name}</strong><small>{coinFormatter.format(card.price)} 金币门槛</small></div>
                 <span className={card.unlocked ? 'unlocked' : 'locked'}>{!card.implemented ? '待开发' : card.unlocked ? '购买' : '未解锁'}</span>
               </button>
@@ -837,6 +854,7 @@ export function App() {
                       >
                         <button type="button" onClick={() => openTicket(slotTicket)}>
                           <img src={ticketArtworkFor(slotTicket.cardCode)} alt={`${slotTicket.cardName}票面`} />
+                          {slotTicket.state === 'purchased' && <TicketScratchCoating cardCode={slotTicket.cardCode} progress={visualProgress} />}
                           <TicketResultSurface ticket={slotTicket} compact />
                           <strong>{slotTicket.cardName}</strong>
                           <small>{!visuallyComplete
@@ -878,6 +896,7 @@ export function App() {
                 onRobot={(ticket) => void enqueueRobot(ticket)}
                 fanAction={fanActions[ticket.id]}
                 motion={ticket.id === robotEjectedTicketId ? 'robot-ejected' : ticket.id === redeemingTicketId ? 'redeeming' : ticket.id === discardingTicketId ? 'discarding' : undefined}
+                scratchProgress={scratchProgress[ticket.id] ?? 0}
                 onDrop={handleTicketDrop}
               />
             ))}
@@ -901,7 +920,7 @@ export function App() {
             <img className="scratch-zoom-artwork" src={ticketArtworkFor(activeTicket.cardCode)} alt={`${activeTicket.cardName}刮刮乐票面`} />
             <div className="scratch-zoom-layer">
             {scratchRequired ? (
-              <ScratchCard cardCode={activeTicket.cardCode} cardName={activeTicket.cardName} symbols={activeTicket.symbols ?? []} scratchLevel={user.scratchLevel} prizeTier={activeTicket.prizeTier} onProgress={(progress) => rememberScratchProgress(activeTicket.id, progress)} onComplete={() => setScratchComplete(true)} />
+              <ScratchCard cardCode={activeTicket.cardCode} cardName={activeTicket.cardName} symbols={activeTicket.symbols ?? []} scratchLevel={user.scratchLevel} prizeTier={activeTicket.prizeTier} onProgress={(progress) => rememberScratchProgress(activeTicket.id, progress)} onComplete={() => void completeScratch(activeTicket.id)} />
             ) : (
               <ResultSymbols cardCode={activeTicket.cardCode} cardName={activeTicket.cardName} symbols={activeTicket.symbols ?? []} prizeTier={activeTicket.prizeTier} />
             )}
