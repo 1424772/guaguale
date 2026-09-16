@@ -3,9 +3,9 @@ package game
 import "testing"
 
 func TestShopPricesEffectsAndRelocking(t *testing.T) {
-	shop := Shop(1600, 0, 1, false, false, false, 0, 0, 0)
-	if len(shop.Items) != 8 {
-		t.Fatalf("expected eight shop items, got %#v", shop.Items)
+	shop := Shop(1600, 0, 1, false, false, 0, false, 0, 0, 0)
+	if len(shop.Items) != 9 {
+		t.Fatalf("expected nine shop items, got %#v", shop.Items)
 	}
 	luck := shop.Items[0]
 	if luck.Code != LuckItemCode || luck.Level != 0 || luck.NextPrice != 300 || luck.NextEffectPercent != 4 {
@@ -14,7 +14,7 @@ func TestShopPricesEffectsAndRelocking(t *testing.T) {
 	if len(luck.RelockedCards) != 1 || luck.RelockedCards[0] != "街角杂货铺" {
 		t.Fatalf("unexpected relocked cards: %#v", luck.RelockedCards)
 	}
-	rangeItem := Shop(100000, 10, 10, true, true, true, 8, 6, 8).Items[1]
+	rangeItem := Shop(100000, 10, 10, true, true, 8, true, 8, 6, 8).Items[1]
 	if rangeItem.Level != 10 || rangeItem.EffectPercent != 100 || rangeItem.NextPrice != 0 || rangeItem.TotalSpent != 71350 {
 		t.Fatalf("unexpected max scratch range: %#v", rangeItem)
 	}
@@ -24,11 +24,14 @@ func TestShopPricesEffectsAndRelocking(t *testing.T) {
 	if shop.Items[3].Code != CardSlotsItemCode || shop.Items[3].NextPrice != 500 || shop.Items[3].EffectText != "未购买" {
 		t.Fatalf("unexpected card slots item: %#v", shop.Items[3])
 	}
-	if shop.Items[4].Code != RobotItemCode || shop.Items[4].NextPrice != 1000 {
-		t.Fatalf("unexpected robot item: %#v", shop.Items[4])
+	if shop.Items[4].Code != FanItemCode || !shop.Items[4].Locked {
+		t.Fatalf("fan should require the trash item: %#v", shop.Items[4])
 	}
-	if !shop.Items[5].Locked || !shop.Items[6].Locked || !shop.Items[7].Locked {
-		t.Fatalf("robot modules should be locked before robot purchase: %#v", shop.Items[5:])
+	if shop.Items[5].Code != RobotItemCode || shop.Items[5].NextPrice != 1000 {
+		t.Fatalf("unexpected robot item: %#v", shop.Items[5])
+	}
+	if !shop.Items[6].Locked || !shop.Items[7].Locked || !shop.Items[8].Locked {
+		t.Fatalf("robot modules should be locked before robot purchase: %#v", shop.Items[6:])
 	}
 }
 

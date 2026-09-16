@@ -6,6 +6,8 @@ export type User = {
   scratchLevel: number
   trashOwned: boolean
   cardSlotsOwned: boolean
+  fanLevel: number
+  fanRiskAcknowledged: boolean
   robotOwned: boolean
   robotSpeedLevel: number
   robotQueueLevel: number
@@ -14,7 +16,7 @@ export type User = {
 }
 
 export type ShopItem = {
-  code: 'luck' | 'scratch-range' | 'trash' | 'card-slots' | 'robot' | 'robot-speed' | 'robot-queue' | 'robot-intercept'
+  code: 'luck' | 'scratch-range' | 'trash' | 'card-slots' | 'fan' | 'robot' | 'robot-speed' | 'robot-queue' | 'robot-intercept'
   name: string
   category: 'luck' | 'efficiency' | 'safety'
   level: number
@@ -140,6 +142,26 @@ export type RobotEvent = {
   autoRedeemed: boolean
 }
 
+export type FanStatus = {
+  owned: boolean
+  level: number
+  forceText: string
+  mistakePercent: number
+  unprotectedDiscardPercent: number
+  riskAcknowledged: boolean
+}
+
+export type FanCardEvent = {
+  ticket: Ticket
+  action: 'discarded' | 'robot' | 'caught' | 'safe'
+}
+
+export type FanEvent = {
+  id: string
+  cards: FanCardEvent[]
+  idempotent: boolean
+}
+
 type ApiErrorBody = {
   error?: {
     code?: string
@@ -263,5 +285,11 @@ export const api = {
   }),
   tickRobot: () => request<{ user: User; robot: RobotStatus; event?: RobotEvent }>('/api/v1/robot/tick', {
     method: 'POST',
+  }),
+  fan: () => request<{ fan: FanStatus }>('/api/v1/fan'),
+  blowFan: (eventId: string, acknowledgeRisk: boolean) => request<{ user: User; fan: FanStatus; robot: RobotStatus; event: FanEvent }>('/api/v1/fan/blow', {
+    method: 'POST',
+    headers: { 'Idempotency-Key': eventId },
+    body: JSON.stringify({ acknowledgeRisk }),
   }),
 }

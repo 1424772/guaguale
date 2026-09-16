@@ -11,6 +11,7 @@ const (
 	ScratchRangeItemCode   = "scratch-range"
 	TrashItemCode          = "trash"
 	CardSlotsItemCode      = "card-slots"
+	FanItemCode            = "fan"
 	RobotItemCode          = "robot"
 	RobotSpeedItemCode     = "robot-speed"
 	RobotQueueItemCode     = "robot-queue"
@@ -54,6 +55,14 @@ var itemDefinitions = []itemDefinition{
 		description: "购买后永久开放10个卡位，固定的卡不会被丢弃或参与后续风扇清理。",
 	},
 	{
+		code: FanItemCode, name: "桌面清理风扇", category: "safety", defaultLevel: 0,
+		effects:     []int{0, 80, 68, 55, 42, 30, 18, 8, 0},
+		prices:      []int64{0, 500, 300, 700, 1500, 3000, 6000, 12000, 24000},
+		effectTexts: []string{"未购买", "1.0x风力 · 吹错80%", "1.2x风力 · 吹错68%", "1.5x风力 · 吹错55%", "1.9x风力 · 吹错42%", "2.4x风力 · 吹错30%", "3.0x风力 · 吹错18%", "3.8x风力 · 吹错8%", "5.0x风力 · 吹错0%"},
+		description: "按住风扇清理自由桌面。已刮卡直接进垃圾桶，未刮卡先由机器人拦截，再按吹错率判定。",
+		notice:      "固定卡槽完全不受影响；首次启动前必须确认风险。",
+	},
+	{
 		code: RobotItemCode, name: "自动刮奖机器人", category: "efficiency", defaultLevel: 0,
 		effects: []int{0, 100}, prices: []int64{0, 1000}, effectTexts: []string{"未购买", "速度1 · 队列3 · 拦截45%"},
 		description: "购买后可把未刮开的卡交给机器人依次处理；中奖自动兑奖，未中奖退回桌面。",
@@ -81,10 +90,11 @@ var itemDefinitions = []itemDefinition{
 	},
 }
 
-func Shop(balance int64, luckLevel, scratchLevel uint8, trashOwned, cardSlotsOwned, robotOwned bool, robotSpeedLevel, robotQueueLevel, robotInterceptLevel uint8) domain.ShopStatus {
+func Shop(balance int64, luckLevel, scratchLevel uint8, trashOwned, cardSlotsOwned bool, fanLevel uint8, robotOwned bool, robotSpeedLevel, robotQueueLevel, robotInterceptLevel uint8) domain.ShopStatus {
 	levels := map[string]uint8{
 		LuckItemCode: luckLevel, ScratchRangeItemCode: scratchLevel,
 		TrashItemCode: boolLevel(trashOwned), CardSlotsItemCode: boolLevel(cardSlotsOwned),
+		FanItemCode:   fanLevel,
 		RobotItemCode: boolLevel(robotOwned), RobotSpeedItemCode: robotSpeedLevel,
 		RobotQueueItemCode: robotQueueLevel, RobotInterceptItemCode: robotInterceptLevel,
 	}
@@ -95,6 +105,11 @@ func Shop(balance int64, luckLevel, scratchLevel uint8, trashOwned, cardSlotsOwn
 			level = definition.defaultLevel
 		}
 		item := shopItem(definition, level, balance)
+		if definition.code == FanItemCode && !trashOwned {
+			item.Locked = true
+			item.LockedReason = "请先购买垃圾桶"
+			item.NextPrice = 0
+		}
 		if !robotOwned && isRobotModule(definition.code) {
 			item.Locked = true
 			item.LockedReason = "请先购买自动刮奖机器人"

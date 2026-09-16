@@ -1,5 +1,5 @@
-import { FormEvent, useEffect, useMemo, useRef, useState } from 'react'
-import { ApiError, api, type Card, type DailyStatus, type RobotStatus, type ShopItem, type ShopStatus, type Ticket, type User } from './api'
+import { FormEvent, KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerEvent, useEffect, useMemo, useRef, useState } from 'react'
+import { ApiError, api, type Card, type DailyStatus, type FanCardEvent, type FanStatus, type RobotStatus, type ShopItem, type ShopStatus, type Ticket, type User } from './api'
 import { DeskTicket, type DeskPlacement } from './DeskTicket'
 import { PlateCleaning } from './PlateCleaning'
 import { ScratchCard } from './ScratchCard'
@@ -30,6 +30,12 @@ export function App() {
   const [shop, setShop] = useState<ShopStatus | null>(null)
   const [robot, setRobot] = useState<RobotStatus | null>(null)
   const [robotOpen, setRobotOpen] = useState(false)
+  const [fan, setFan] = useState<FanStatus | null>(null)
+  const [fanRiskOpen, setFanRiskOpen] = useState(false)
+  const [fanRiskPending, setFanRiskPending] = useState(false)
+  const [fanHolding, setFanHolding] = useState(false)
+  const [fanBusy, setFanBusy] = useState(false)
+  const [fanActions, setFanActions] = useState<Record<string, FanCardEvent['action']>>({})
   const [dailyBusy, setDailyBusy] = useState(false)
   const [wheelSpinning, setWheelSpinning] = useState(false)
   const [pendingDiscard, setPendingDiscard] = useState<Ticket | null>(null)
@@ -40,6 +46,7 @@ export function App() {
   const robotZoneRef = useRef<HTMLButtonElement>(null)
   const slotRefs = useRef<Array<HTMLDivElement | null>>([])
   const robotTickingRef = useRef(false)
+  const fanHoldTimerRef = useRef<number | null>(null)
 
   useEffect(() => {
     void bootstrap()
@@ -95,11 +102,12 @@ export function App() {
   }
 
   async function loadGameData() {
-    const [cardResponse, ticketResponse, dailyResponse, robotResponse] = await Promise.all([api.cards(), api.tickets(), api.daily(), api.robot()])
+    const [cardResponse, ticketResponse, dailyResponse, robotResponse, fanResponse] = await Promise.all([api.cards(), api.tickets(), api.daily(), api.robot(), api.fan()])
     setCards(cardResponse.cards)
     setTickets(ticketResponse.tickets)
     setDaily(dailyResponse.daily)
     setRobot(robotResponse.robot)
+    setFan(fanResponse.fan)
   }
 
   async function handleAuthenticated(nextUser: User) {
@@ -112,6 +120,7 @@ export function App() {
     setBusy(true)
     try {
       if (discardTimerRef.current !== null) window.clearTimeout(discardTimerRef.current)
+      if (fanHoldTimerRef.current !== null) window.clearTimeout(fanHoldTimerRef.current)
       discardTimerRef.current = null
       setPendingDiscard(null)
       await api.logout()
@@ -121,7 +130,10 @@ export function App() {
       setDaily(null)
       setShop(null)
       setRobot(null)
+      setFan(null)
       setRobotOpen(false)
+      setFanRiskOpen(false)
+      setFanActions({})
       setShopOpen(false)
       setActiveTicket(null)
     } catch (error) {
@@ -241,6 +253,10 @@ export function App() {
       if (item.code.startsWith('robot')) {
         const robotResponse = await api.robot()
         setRobot(robotResponse.robot)
+      }
+      if (item.code === 'fan') {
+        const fanResponse = await api.fan()
+        setFan(fanResponse.fan)
       }
       const updated = result.shop.items.find((candidate) => candidate.code === result.itemCode)
       setNotice(item.maxLevel === 1 ? `${updated?.name ?? item.name}购买成功，已永久开放` : `${updated?.name ?? item.name}已升级到 ${updated?.level ?? item.level + 1} 级`)
@@ -480,6 +496,86 @@ export function App() {
     setPendingDiscard(null)
   }
 
+  function startFanHold(event: ReactPointerEvent<HTMLButtonElement>) {
+    if (!beginFanHold()) return
+    event.currentTarget.setPointerCapture(event.pointerId)
+  }
+
+  function startFanKeyboard(event: ReactKeyboardEvent<HTMLButtonElement>) {
+    if ((event.key !== ' ' && event.key !== 'Enter') || event.repeat) return
+    event.preventDefault()
+    beginFanHold()
+  }
+
+  function beginFanHold() {
+    if (fanBusy || busy || fanHoldTimerRef.current !== null) return false
+    if (pendingDiscard) {
+      setNotice('请先等待或撤销当前垃圾桶操作，再启动风扇')
+      return false
+    }
+    if (!fan?.owned) {
+      void openShop('fan')
+      return false
+    }
+    if (!user?.trashOwned) {
+      setNotice('请先购买垃圾桶，风扇才能完成清理')
+      void openShop('trash')
+      return false
+    }
+    if (deskTickets.length === 0) {
+      setNotice('自由桌面上没有可以吹动的卡片')
+      return false
+    }
+    if (!fan.riskAcknowledged && !fanRiskPending) {
+      setFanRiskOpen(true)
+      return false
+    }
+    setFanHolding(true)
+    fanHoldTimerRef.current = window.setTimeout(() => void runFan(), 650)
+    return true
+  }
+
+  function stopFanHold() {
+    if (fanHoldTimerRef.current !== null) window.clearTimeout(fanHoldTimerRef.current)
+    fanHoldTimerRef.current = null
+    if (!fanBusy) setFanHolding(false)
+  }
+
+  async function runFan() {
+    fanHoldTimerRef.current = null
+    if (fanBusy) return
+    setFanBusy(true)
+    setFanHolding(true)
+    try {
+      const result = await api.blowFan(crypto.randomUUID(), fanRiskPending || Boolean(fan?.riskAcknowledged))
+      setUser(result.user)
+      setFan(result.fan)
+      setRobot(result.robot)
+      setFanRiskPending(false)
+      const actions = Object.fromEntries(result.event.cards.map((card) => [card.ticket.id, card.action]))
+      setFanActions(actions)
+      await new Promise((resolve) => window.setTimeout(resolve, Math.max(420, 960 - result.fan.level * 60)))
+      const affected = new Map(result.event.cards.map((card) => [card.ticket.id, card]))
+      setTickets((current) => current.flatMap((ticket) => {
+        const card = affected.get(ticket.id)
+        if (!card) return [ticket]
+        if (card.action === 'discarded') return []
+        return [card.ticket]
+      }))
+      if (activeTicket && affected.has(activeTicket.id)) setActiveTicket(null)
+      const discarded = result.event.cards.filter((card) => card.action === 'discarded').length
+      const intercepted = result.event.cards.filter((card) => card.action === 'robot' || card.action === 'caught').length
+      const safe = result.event.cards.filter((card) => card.action === 'safe').length
+      setNotice(`送风完成：清理${discarded}张，机器人保护${intercepted}张，安全落回${safe}张`)
+    } catch (error) {
+      setNotice(messageFrom(error))
+    } finally {
+      setFanActions({})
+      setFanBusy(false)
+      setFanHolding(false)
+    }
+  }
+
   if (booting) {
     return <div className="loading-screen"><span className="spinner" />正在打开桌面…</div>
   }
@@ -562,7 +658,21 @@ export function App() {
             <p>未兑奖卡会一直保留</p>
           </div>
 
-          <div className="desk-zones">
+          <div className={`desk-zones ${fanHolding ? 'fan-active' : ''}`}>
+            <button
+              type="button"
+              className={`fan-station ${fan?.owned ? 'owned' : 'locked'} ${fanHolding ? 'working' : ''}`}
+              onPointerDown={startFanHold}
+              onPointerUp={stopFanHold}
+              onPointerCancel={stopFanHold}
+              onKeyDown={startFanKeyboard}
+              onKeyUp={(event) => { if (event.key === ' ' || event.key === 'Enter') stopFanHold() }}
+              onContextMenu={(event) => event.preventDefault()}
+            >
+              <span aria-hidden="true">✺</span><strong>{fan?.owned ? '按住风扇' : '清理风扇'}</strong>
+              <small>{fan?.owned ? `${fan.forceText} · 吹错${fan.mistakePercent}%` : '购买 · 500金币'}</small>
+              {fanHolding && <i>送风中</i>}
+            </button>
             <div className="redeem-drop-zone" ref={redeemZoneRef}>
               <span>兑奖区</span><strong>中奖卡拖到这里</strong><small>未中奖卡不会被兑换</small>
             </div>
@@ -594,7 +704,7 @@ export function App() {
             </div>}
           </section>
 
-          <div className="free-desk" ref={deskRef} aria-label="可自由摆放卡片的桌面">
+          <div className={`free-desk ${fanHolding ? 'fan-active' : ''}`} ref={deskRef} aria-label="可自由摆放卡片的桌面">
             <button
               type="button"
               ref={robotZoneRef}
@@ -618,6 +728,7 @@ export function App() {
                 onOpen={openTicket}
                 onPin={pinToFirstSlot}
                 onRobot={(ticket) => void enqueueRobot(ticket)}
+                fanAction={fanActions[ticket.id]}
                 onDrop={handleTicketDrop}
               />
             ))}
@@ -683,6 +794,18 @@ export function App() {
 
       {robotOpen && robot?.owned && (
         <RobotDialog robot={robot} onClose={() => setRobotOpen(false)} onOpenShop={(code) => { setRobotOpen(false); void openShop(code) }} />
+      )}
+
+      {fanRiskOpen && (
+        <div className="modal-backdrop" role="presentation">
+          <section className="fan-risk-dialog" role="dialog" aria-modal="true" aria-label="风扇风险说明">
+            <span className="fan-risk-icon" aria-hidden="true">✺</span>
+            <h2>启动风扇前请确认</h2>
+            <p>风扇会吹动自由桌面上的所有卡片。已刮完的卡会直接进入垃圾桶；未刮完的卡如果没有被机器人拦截，也可能因吹错而被丢弃。</p>
+            <p>固定卡槽内的卡完全不受影响。风扇造成的丢弃不会退还金币，也不会补发奖励。</p>
+            <div><button type="button" className="secondary-button" onClick={() => setFanRiskOpen(false)}>暂不使用</button><button type="button" className="gold-button" onClick={() => { setFanRiskPending(true); setFanRiskOpen(false); setNotice('风险已确认，请持续按住风扇启动') }}>我已了解</button></div>
+          </section>
+        </div>
       )}
     </main>
   )

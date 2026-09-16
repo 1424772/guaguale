@@ -26,6 +26,8 @@ var (
 	ErrRobotQueueFull    = errors.New("robot queue is full")
 	ErrRobotManaged      = errors.New("ticket is managed by robot")
 	ErrRobotUnsupported  = errors.New("ticket does not support robot")
+	ErrFanRequired       = errors.New("fan item is required")
+	ErrFanRiskRequired   = errors.New("fan risk acknowledgement is required")
 )
 
 type CreateTicketInput struct {
@@ -77,6 +79,20 @@ type EnqueueRobotInput struct {
 	EnqueuedAt time.Time
 }
 
+type FanRollFunc func(max int) int
+
+type BlowFanInput struct {
+	UserID           uint64
+	EventID          string
+	AcknowledgeRisk  bool
+	MistakePercent   int
+	InterceptPercent int
+	RobotCapacity    int
+	RobotDurationMS  int64
+	Now              time.Time
+	Roll             FanRollFunc
+}
+
 type Store interface {
 	Ping(context.Context) error
 	CreateUser(context.Context, string, string, int64) (domain.User, error)
@@ -94,6 +110,7 @@ type Store interface {
 	ListRobotQueue(context.Context, uint64) ([]domain.RobotQueueItem, error)
 	EnqueueRobot(context.Context, EnqueueRobotInput) (domain.Ticket, []domain.RobotQueueItem, error)
 	TickRobot(context.Context, uint64, time.Time, int64) (domain.User, *domain.RobotEvent, []domain.RobotQueueItem, error)
+	BlowFan(context.Context, BlowFanInput) (domain.User, domain.FanEvent, []domain.RobotQueueItem, error)
 	DailyStatus(context.Context, uint64, string) (domain.DailyStatus, error)
 	ClaimDailyLogin(context.Context, uint64, string, int64) (domain.User, domain.DailyStatus, bool, error)
 	StartPlate(context.Context, uint64, string, domain.PlateAction) (domain.DailyStatus, bool, error)

@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"math"
+	"math/big"
 	"regexp"
 	"strings"
 	"time"
@@ -38,6 +39,7 @@ type Service struct {
 	store    store.Store
 	now      func() time.Time
 	drawCard func(string, uint8) (domain.Outcome, error)
+	fanRoll  store.FanRollFunc
 }
 
 type AuthResult struct {
@@ -90,8 +92,15 @@ type RobotTickResult struct {
 	Event *domain.RobotEvent `json:"event,omitempty"`
 }
 
+type FanResult struct {
+	User  domain.User        `json:"user"`
+	Fan   domain.FanStatus   `json:"fan"`
+	Robot domain.RobotStatus `json:"robot"`
+	Event domain.FanEvent    `json:"event"`
+}
+
 func New(store store.Store) *Service {
-	return &Service{store: store, now: time.Now, drawCard: game.Draw}
+	return &Service{store: store, now: time.Now, drawCard: game.Draw, fanRoll: secureRoll}
 }
 
 func (service *Service) Register(ctx context.Context, username, password string, ageConfirmed bool) (AuthResult, error) {
@@ -148,7 +157,7 @@ func (service *Service) Cards(balance int64) []domain.Card {
 
 func (service *Service) Shop(user domain.User) domain.ShopStatus {
 	return game.Shop(user.Balance, user.LuckLevel, user.ScratchLevel, user.TrashOwned, user.CardSlotsOwned,
-		user.RobotOwned, user.RobotSpeedLevel, user.RobotQueueLevel, user.RobotInterceptLevel)
+		user.FanLevel, user.RobotOwned, user.RobotSpeedLevel, user.RobotQueueLevel, user.RobotInterceptLevel)
 }
 
 func (service *Service) UpgradeItem(ctx context.Context, user domain.User, itemCode, idempotencyKey string) (UpgradeResult, error) {
@@ -170,6 +179,11 @@ func (service *Service) UpgradeItem(ctx context.Context, user domain.User, itemC
 		} else {
 			currentLevel = 0
 		}
+	} else if itemCode == game.FanItemCode {
+		if !user.TrashOwned {
+			return UpgradeResult{}, store.ErrTrashRequired
+		}
+		currentLevel = user.FanLevel
 	} else if itemCode == game.RobotItemCode {
 		currentLevel = boolLevel(user.RobotOwned)
 	} else if itemCode == game.RobotSpeedItemCode {
@@ -269,6 +283,58 @@ func robotStatus(user domain.User, queue []domain.RobotQueueItem) domain.RobotSt
 		Capacity: game.RobotQueueCapacity(user.RobotQueueLevel), InterceptPercent: game.RobotInterceptPercent(user.RobotInterceptLevel),
 		Queue: queue,
 	}
+}
+
+func (service *Service) FanStatus(user domain.User) domain.FanStatus {
+	interceptPercent := 0
+	if user.RobotOwned {
+		interceptPercent = game.RobotInterceptPercent(user.RobotInterceptLevel)
+	}
+	mistakePercent := game.FanMistakePercent(user.FanLevel)
+	return domain.FanStatus{
+		Owned: user.FanLevel > 0, Level: user.FanLevel, ForceText: game.FanForceText(user.FanLevel),
+		MistakePercent:            mistakePercent,
+		UnprotectedDiscardPercent: game.FanDiscardPercent(mistakePercent, interceptPercent),
+		RiskAcknowledged:          user.FanRiskAcknowledged,
+	}
+}
+
+func (service *Service) BlowFan(ctx context.Context, user domain.User, eventID string, acknowledgeRisk bool) (FanResult, error) {
+	if !validIdempotencyKey(eventID) {
+		return FanResult{}, ErrInvalidInput
+	}
+	if user.FanLevel == 0 {
+		return FanResult{}, store.ErrFanRequired
+	}
+	if !user.TrashOwned {
+		return FanResult{}, store.ErrTrashRequired
+	}
+	interceptPercent := 0
+	if user.RobotOwned {
+		interceptPercent = game.RobotInterceptPercent(user.RobotInterceptLevel)
+	}
+	updatedUser, event, queue, err := service.store.BlowFan(ctx, store.BlowFanInput{
+		UserID: user.ID, EventID: eventID, AcknowledgeRisk: acknowledgeRisk,
+		MistakePercent: game.FanMistakePercent(user.FanLevel), InterceptPercent: interceptPercent,
+		RobotCapacity:   game.RobotQueueCapacity(user.RobotQueueLevel),
+		RobotDurationMS: int64(game.RobotDurationSeconds(user.RobotSpeedLevel)) * 1000,
+		Now:             service.now().UTC(), Roll: service.fanRoll,
+	})
+	if err != nil {
+		return FanResult{}, err
+	}
+	return FanResult{User: updatedUser, Fan: service.FanStatus(updatedUser), Robot: robotStatus(updatedUser, queue), Event: event}, nil
+}
+
+func secureRoll(maximum int) int {
+	if maximum <= 1 {
+		return 0
+	}
+	value, err := rand.Int(rand.Reader, big.NewInt(int64(maximum)))
+	if err != nil {
+		return maximum - 1
+	}
+	return int(value.Int64())
 }
 
 func (service *Service) Purchase(ctx context.Context, user domain.User, cardCode, idempotencyKey string) (PurchaseResult, error) {

@@ -10,6 +10,8 @@ type User struct {
 	ScratchLevel        uint8     `json:"scratchLevel"`
 	TrashOwned          bool      `json:"trashOwned"`
 	CardSlotsOwned      bool      `json:"cardSlotsOwned"`
+	FanLevel            uint8     `json:"fanLevel"`
+	FanRiskAcknowledged bool      `json:"fanRiskAcknowledged"`
 	RobotOwned          bool      `json:"robotOwned"`
 	RobotSpeedLevel     uint8     `json:"robotSpeedLevel"`
 	RobotQueueLevel     uint8     `json:"robotQueueLevel"`
@@ -185,4 +187,24 @@ type RobotStatus struct {
 type RobotEvent struct {
 	Ticket       Ticket `json:"ticket"`
 	AutoRedeemed bool   `json:"autoRedeemed"`
+}
+
+type FanStatus struct {
+	Owned                     bool    `json:"owned"`
+	Level                     uint8   `json:"level"`
+	ForceText                 string  `json:"forceText"`
+	MistakePercent            int     `json:"mistakePercent"`
+	UnprotectedDiscardPercent float64 `json:"unprotectedDiscardPercent"`
+	RiskAcknowledged          bool    `json:"riskAcknowledged"`
+}
+
+type FanCardEvent struct {
+	Ticket Ticket `json:"ticket"`
+	Action string `json:"action"`
+}
+
+type FanEvent struct {
+	ID         string         `json:"id"`
+	Cards      []FanCardEvent `json:"cards"`
+	Idempotent bool           `json:"idempotent"`
 }

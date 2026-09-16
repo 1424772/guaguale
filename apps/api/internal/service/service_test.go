@@ -247,7 +247,7 @@ func TestPermanentItemUpgrades(t *testing.T) {
 		t.Fatalf("unexpected default item levels: %#v", authResult.User)
 	}
 	shop := service.Shop(authResult.User)
-	if len(shop.Items) != 8 || shop.Items[0].NextPrice != 300 || shop.Items[1].NextPrice != 100 || shop.Items[2].NextPrice != 100 || shop.Items[3].NextPrice != 500 || shop.Items[4].NextPrice != 1000 {
+	if len(shop.Items) != 9 || shop.Items[0].NextPrice != 300 || shop.Items[1].NextPrice != 100 || shop.Items[2].NextPrice != 100 || shop.Items[3].NextPrice != 500 || shop.Items[5].NextPrice != 1000 {
 		t.Fatalf("unexpected initial shop: %#v", shop)
 	}
 
@@ -317,8 +317,8 @@ func TestRobotQueuePausesOfflineAndProcessesInOrder(t *testing.T) {
 		t.Fatalf("unexpected robot purchase: %#v", robot.User)
 	}
 	robotShop := service.Shop(robot.User)
-	if robotShop.Items[5].Locked || robotShop.Items[5].Level != 1 || robotShop.Items[5].NextPrice != 500 || robotShop.Items[6].NextPrice != 300 || robotShop.Items[7].NextPrice != 600 {
-		t.Fatalf("unexpected unlocked robot modules: %#v", robotShop.Items[5:])
+	if robotShop.Items[6].Locked || robotShop.Items[6].Level != 1 || robotShop.Items[6].NextPrice != 500 || robotShop.Items[7].NextPrice != 300 || robotShop.Items[8].NextPrice != 600 {
+		t.Fatalf("unexpected unlocked robot modules: %#v", robotShop.Items[6:])
 	}
 	draws := 0
 	service.drawCard = func(string, uint8) (domain.Outcome, error) {
@@ -380,5 +380,156 @@ func TestRobotQueuePausesOfflineAndProcessesInOrder(t *testing.T) {
 	}
 	if loser.Event == nil || loser.Event.AutoRedeemed || loser.Event.Ticket.ID != second.Ticket.ID || loser.Event.Ticket.State != domain.TicketScratched || loser.Event.Ticket.Location != domain.TicketOnDesk || len(loser.Robot.Queue) != 0 {
 		t.Fatalf("unexpected loser event: %#v", loser)
+	}
+}
+
+func TestFanRequiresRiskAcknowledgementAndProcessesDeskOnce(t *testing.T) {
+	ctx := context.Background()
+	service := New(memory.New())
+	clock := time.Date(2026, 9, 16, 4, 0, 0, 0, time.UTC)
+	service.now = func() time.Time { return clock }
+	service.fanRoll = func(int) int { return 99 }
+	account, err := service.Register(ctx, "风扇玩家", "correct-horse-42", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	trash, err := service.UpgradeItem(ctx, account.User, "trash", "fan-trash-001")
+	if err != nil {
+		t.Fatal(err)
+	}
+	fan, err := service.UpgradeItem(ctx, trash.User, "fan", "buy-fan-001")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fan.User.FanLevel != 1 || fan.User.Balance != 400 {
+		t.Fatalf("unexpected fan purchase: %#v", fan.User)
+	}
+	service.drawCard = func(string, uint8) (domain.Outcome, error) {
+		return domain.Outcome{PrizeTier: "none", Symbols: []string{"狗头金币", "钞票", "碎钻石"}}, nil
+	}
+	first, err := service.Purchase(ctx, fan.User, "lingqian-ticket", "fan-card-001")
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := service.Purchase(ctx, first.User, "lingqian-ticket", "fan-card-002")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for index, ticket := range []domain.Ticket{first.Ticket, second.Ticket} {
+		if _, err := service.PlaceTicket(ctx, account.User.ID, ticket.ID, store.TicketPlacement{
+			Location: domain.TicketOnDesk, DeskX: .3 + float64(index)*.2, DeskY: .4, ZIndex: index + 1,
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := service.Scratch(ctx, account.User.ID, first.Ticket.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.BlowFan(ctx, second.User, "fan-event-001", false); !errors.Is(err, store.ErrFanRiskRequired) {
+		t.Fatalf("expected risk acknowledgement error, got %v", err)
+	}
+	result, err := service.BlowFan(ctx, second.User, "fan-event-001", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.User.FanRiskAcknowledged || len(result.Event.Cards) != 2 || result.Fan.MistakePercent != 80 {
+		t.Fatalf("unexpected fan result: %#v", result)
+	}
+	actions := map[string]string{}
+	for _, card := range result.Event.Cards {
+		actions[card.Ticket.ID] = card.Action
+	}
+	if actions[first.Ticket.ID] != "discarded" || actions[second.Ticket.ID] != "safe" {
+		t.Fatalf("unexpected fan actions: %#v", actions)
+	}
+	retry, err := service.BlowFan(ctx, result.User, "fan-event-001", true)
+	if err != nil || !retry.Event.Idempotent || len(retry.Event.Cards) != 2 {
+		t.Fatalf("fan retry was not idempotent: %#v, %v", retry, err)
+	}
+	active, err := service.Tickets(ctx, account.User.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(active) != 1 || active[0].ID != second.Ticket.ID || active[0].Location != domain.TicketOnDesk {
+		t.Fatalf("unexpected tickets after fan: %#v", active)
+	}
+}
+
+func TestFanRobotInterceptionKeepsCardSafeWhenQueueIsFull(t *testing.T) {
+	ctx := context.Background()
+	service := New(memory.New())
+	service.fanRoll = func(int) int { return 0 }
+	account, err := service.Register(ctx, "联动玩家", "correct-horse-42", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	service.drawCard = func(string, uint8) (domain.Outcome, error) {
+		return domain.Outcome{PrizeTier: "top", Reward: 2000, Symbols: []string{"钞票堆", "钞票堆", "狗头金币"}}, nil
+	}
+	seed, err := service.Purchase(ctx, account.User, "lingqian-ticket", "fan-seed-card")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.Scratch(ctx, account.User.ID, seed.Ticket.ID); err != nil {
+		t.Fatal(err)
+	}
+	funded, err := service.Redeem(ctx, account.User.ID, seed.Ticket.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	trash, err := service.UpgradeItem(ctx, funded.User, "trash", "fan-link-trash")
+	if err != nil {
+		t.Fatal(err)
+	}
+	fan, err := service.UpgradeItem(ctx, trash.User, "fan", "fan-link-buy")
+	if err != nil {
+		t.Fatal(err)
+	}
+	robot, err := service.UpgradeItem(ctx, fan.User, "robot", "fan-link-robot")
+	if err != nil {
+		t.Fatal(err)
+	}
+	service.drawCard = func(string, uint8) (domain.Outcome, error) {
+		return domain.Outcome{PrizeTier: "none", Symbols: []string{"狗头金币", "钞票", "碎钻石"}}, nil
+	}
+	cards := make([]domain.Ticket, 0, 4)
+	current := robot.User
+	for index := 0; index < 4; index++ {
+		purchase, err := service.Purchase(ctx, current, "lingqian-ticket", "fan-link-card-00"+string(rune('1'+index)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		current = purchase.User
+		cards = append(cards, purchase.Ticket)
+	}
+	for _, ticket := range cards[:3] {
+		if _, err := service.EnqueueRobot(ctx, current, ticket.ID); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := service.PlaceTicket(ctx, account.User.ID, cards[3].ID, store.TicketPlacement{
+		Location: domain.TicketOnDesk, DeskX: .4, DeskY: .4, ZIndex: 4,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	result, err := service.BlowFan(ctx, current, "fan-link-event", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.Event.Cards) != 1 || result.Event.Cards[0].Action != "caught" || len(result.Robot.Queue) != 3 {
+		t.Fatalf("full robot queue did not catch card safely: %#v", result)
+	}
+	active, err := service.Tickets(ctx, account.User.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, ticket := range active {
+		if ticket.ID == cards[3].ID {
+			found = ticket.Location == domain.TicketOnDesk
+		}
+	}
+	if !found {
+		t.Fatal("intercepted card was not returned safely to the desk")
 	}
 }

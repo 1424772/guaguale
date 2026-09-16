@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { ShopItem, ShopStatus, User } from './api'
 
 const coins = new Intl.NumberFormat('zh-CN')
+const robotInterceptPercents = [0, 45, 55, 64, 72, 80, 87, 94, 100]
 
 type Props = {
   user: User
@@ -17,6 +18,7 @@ const itemMeta: Record<ShopItem['code'], { icon: string; group: string }> = {
   'scratch-range': { icon: '⌁', group: '操作效率' },
   trash: { icon: '🗑', group: '桌面整理' },
   'card-slots': { icon: '▥', group: '卡片保护' },
+  fan: { icon: '✺', group: '桌面整理' },
   robot: { icon: '▣', group: '自动刮奖' },
   'robot-speed': { icon: '⚡', group: '处理速度' },
   'robot-queue': { icon: '☷', group: '等待容量' },
@@ -51,6 +53,8 @@ export function ShopDialog({ user, shop, busy, initialItemCode, onClose, onUpgra
   const afterBalance = user.balance - nextPrice
   const oneTime = selected.maxLevel === 1
   const action = oneTime ? '购买' : '升级'
+  const interceptPercent = user.robotOwned ? (robotInterceptPercents[user.robotInterceptLevel] ?? 100) : 0
+  const fanRisk = (mistakePercent: number) => Math.round((100 - interceptPercent) * mistakePercent) / 100
 
   function selectCategory(nextCategory: ShopItem['category']) {
     const first = shop.items.find((item) => item.category === nextCategory)
@@ -95,6 +99,13 @@ export function ShopDialog({ user, shop, busy, initialItemCode, onClose, onUpgra
               <span>→</span>
               <div><small>{maxed ? '当前状态' : oneTime ? '购买后' : `升级至 ${selected.level + 1} 级`}</small><strong>{maxed ? selected.effectText : selected.nextEffectText}</strong></div>
             </div>
+            {selected.code === 'fan' && (
+              <div className="fan-risk-math">
+                <small>结合当前机器人拦截率 {interceptPercent}%</small>
+                <strong>{selected.level === 0 ? '购买后' : '当前'}未刮卡入桶风险 {fanRisk(selected.level === 0 ? (selected.nextEffectPercent ?? 0) : selected.effectPercent)}%</strong>
+                {!maxed && selected.level > 0 && <span>升级后降至 {fanRisk(selected.nextEffectPercent ?? 0)}%</span>}
+              </div>
+            )}
             <dl className="shop-costs">
               <div><dt>累计投入</dt><dd>{coins.format(selected.totalSpent)} 金币</dd></div>
               {!maxed && !selected.locked && <div><dt>本次{action}</dt><dd>{coins.format(nextPrice)} 金币</dd></div>}

@@ -74,11 +74,12 @@ func (store *Store) UserByUsername(ctx context.Context, username string) (domain
 	var user domain.User
 	var passwordHash string
 	err := store.db.QueryRowContext(ctx, `
-		SELECT id, username, password_hash, balance, luck_level, scratch_level, trash_owned, card_slots_owned,
+		SELECT id, username, password_hash, balance, luck_level, scratch_level, trash_owned, card_slots_owned, fan_level, fan_risk_acknowledged,
 			robot_owned, robot_speed_level, robot_queue_level, robot_intercept_level, created_at
 		FROM users WHERE username = ?`, username,
 	).Scan(&user.ID, &user.Username, &passwordHash, &user.Balance, &user.LuckLevel, &user.ScratchLevel,
-		&user.TrashOwned, &user.CardSlotsOwned, &user.RobotOwned, &user.RobotSpeedLevel, &user.RobotQueueLevel, &user.RobotInterceptLevel, &user.CreatedAt)
+		&user.TrashOwned, &user.CardSlotsOwned, &user.FanLevel, &user.FanRiskAcknowledged,
+		&user.RobotOwned, &user.RobotSpeedLevel, &user.RobotQueueLevel, &user.RobotInterceptLevel, &user.CreatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return domain.User{}, "", basestore.ErrNotFound
 	}
@@ -88,13 +89,14 @@ func (store *Store) UserByUsername(ctx context.Context, username string) (domain
 func (store *Store) UserBySession(ctx context.Context, tokenHash [32]byte) (domain.User, error) {
 	var user domain.User
 	err := store.db.QueryRowContext(ctx, `
-		SELECT u.id, u.username, u.balance, u.luck_level, u.scratch_level, u.trash_owned, u.card_slots_owned,
+		SELECT u.id, u.username, u.balance, u.luck_level, u.scratch_level, u.trash_owned, u.card_slots_owned, u.fan_level, u.fan_risk_acknowledged,
 			u.robot_owned, u.robot_speed_level, u.robot_queue_level, u.robot_intercept_level, u.created_at
 		FROM sessions s
 		JOIN users u ON u.id = s.user_id
 		WHERE s.token_hash = ? AND s.expires_at > UTC_TIMESTAMP(6)`, tokenHash[:],
 	).Scan(&user.ID, &user.Username, &user.Balance, &user.LuckLevel, &user.ScratchLevel,
-		&user.TrashOwned, &user.CardSlotsOwned, &user.RobotOwned, &user.RobotSpeedLevel, &user.RobotQueueLevel, &user.RobotInterceptLevel, &user.CreatedAt)
+		&user.TrashOwned, &user.CardSlotsOwned, &user.FanLevel, &user.FanRiskAcknowledged,
+		&user.RobotOwned, &user.RobotSpeedLevel, &user.RobotQueueLevel, &user.RobotInterceptLevel, &user.CreatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return domain.User{}, basestore.ErrNotFound
 	}
@@ -602,6 +604,12 @@ func (store *Store) UpgradeItem(ctx context.Context, input basestore.UpgradeItem
 	} else if input.ItemCode == "card-slots" {
 		currentLevel = boolLevel(user.CardSlotsOwned)
 		updateQuery = `UPDATE users SET balance = ?, card_slots_owned = ? WHERE id = ?`
+	} else if input.ItemCode == "fan" {
+		if !user.TrashOwned {
+			return domain.User{}, domain.ItemUpgrade{}, false, basestore.ErrTrashRequired
+		}
+		currentLevel = user.FanLevel
+		updateQuery = `UPDATE users SET balance = ?, fan_level = ? WHERE id = ?`
 	} else if input.ItemCode == "robot" {
 		currentLevel = boolLevel(user.RobotOwned)
 		updateQuery = `UPDATE users SET balance = ?, robot_owned = ?, robot_speed_level = 1, robot_queue_level = 1, robot_intercept_level = 1 WHERE id = ?`
@@ -667,6 +675,8 @@ func (store *Store) UpgradeItem(ctx context.Context, input basestore.UpgradeItem
 		user.TrashOwned = true
 	} else if input.ItemCode == "card-slots" {
 		user.CardSlotsOwned = true
+	} else if input.ItemCode == "fan" {
+		user.FanLevel = input.ToLevel
 	} else if input.ItemCode == "robot" {
 		user.RobotOwned = true
 		user.RobotSpeedLevel = 1
@@ -817,11 +827,12 @@ func scanTicket(row scanner) (domain.Ticket, error) {
 func lockedUser(ctx context.Context, tx *sql.Tx, userID uint64) (domain.User, error) {
 	var user domain.User
 	err := tx.QueryRowContext(ctx, `
-		SELECT id, username, balance, luck_level, scratch_level, trash_owned, card_slots_owned,
+		SELECT id, username, balance, luck_level, scratch_level, trash_owned, card_slots_owned, fan_level, fan_risk_acknowledged,
 			robot_owned, robot_speed_level, robot_queue_level, robot_intercept_level, created_at
 		FROM users WHERE id = ? FOR UPDATE`, userID,
 	).Scan(&user.ID, &user.Username, &user.Balance, &user.LuckLevel, &user.ScratchLevel,
-		&user.TrashOwned, &user.CardSlotsOwned, &user.RobotOwned, &user.RobotSpeedLevel, &user.RobotQueueLevel, &user.RobotInterceptLevel, &user.CreatedAt)
+		&user.TrashOwned, &user.CardSlotsOwned, &user.FanLevel, &user.FanRiskAcknowledged,
+		&user.RobotOwned, &user.RobotSpeedLevel, &user.RobotQueueLevel, &user.RobotInterceptLevel, &user.CreatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return domain.User{}, basestore.ErrNotFound
 	}

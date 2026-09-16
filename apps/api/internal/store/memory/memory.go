@@ -29,6 +29,7 @@ type Store struct {
 	upgradeByUserKey  map[string]domain.ItemUpgrade
 	robotQueues       map[uint64][]robotJob
 	robotLastTicks    map[uint64]time.Time
+	fanEvents         map[string]domain.FanEvent
 }
 
 type robotJob struct {
@@ -56,6 +57,7 @@ func New() *Store {
 		upgradeByUserKey:  make(map[string]domain.ItemUpgrade),
 		robotQueues:       make(map[uint64][]robotJob),
 		robotLastTicks:    make(map[uint64]time.Time),
+		fanEvents:         make(map[string]domain.FanEvent),
 	}
 }
 
@@ -99,6 +101,11 @@ func (store *Store) UpgradeItem(_ context.Context, input basestore.UpgradeItemIn
 		currentLevel = boolLevel(record.user.TrashOwned)
 	} else if input.ItemCode == "card-slots" {
 		currentLevel = boolLevel(record.user.CardSlotsOwned)
+	} else if input.ItemCode == "fan" {
+		if !record.user.TrashOwned {
+			return domain.User{}, domain.ItemUpgrade{}, false, basestore.ErrTrashRequired
+		}
+		currentLevel = record.user.FanLevel
 	} else if input.ItemCode == "robot" {
 		currentLevel = boolLevel(record.user.RobotOwned)
 	} else if input.ItemCode == "robot-speed" {
@@ -137,6 +144,8 @@ func (store *Store) UpgradeItem(_ context.Context, input basestore.UpgradeItemIn
 		record.user.TrashOwned = true
 	} else if input.ItemCode == "card-slots" {
 		record.user.CardSlotsOwned = true
+	} else if input.ItemCode == "fan" {
+		record.user.FanLevel = input.ToLevel
 	} else if input.ItemCode == "robot" {
 		record.user.RobotOwned = true
 		record.user.RobotSpeedLevel = 1

@@ -45,6 +45,10 @@ type placementRequest struct {
 	SlotIndex *int                  `json:"slotIndex"`
 }
 
+type fanBlowRequest struct {
+	AcknowledgeRisk bool `json:"acknowledgeRisk"`
+}
+
 type errorResponse struct {
 	Error struct {
 		Code    string `json:"code"`
@@ -74,6 +78,8 @@ func New(service *service.Service, store store.Store, logger *slog.Logger, cooki
 	mux.Handle("GET /api/v1/robot", api.requireUser(http.HandlerFunc(api.robotStatus)))
 	mux.Handle("POST /api/v1/robot/tickets/{id}", api.requireUser(http.HandlerFunc(api.enqueueRobot)))
 	mux.Handle("POST /api/v1/robot/tick", api.requireUser(http.HandlerFunc(api.tickRobot)))
+	mux.Handle("GET /api/v1/fan", api.requireUser(http.HandlerFunc(api.fanStatus)))
+	mux.Handle("POST /api/v1/fan/blow", api.requireUser(http.HandlerFunc(api.blowFan)))
 	mux.Handle("GET /api/v1/daily", api.requireUser(http.HandlerFunc(api.dailyStatus)))
 	mux.Handle("POST /api/v1/daily/login-claim", api.requireUser(http.HandlerFunc(api.claimDailyLogin)))
 	mux.Handle("POST /api/v1/daily/plates/start", api.requireUser(http.HandlerFunc(api.startPlate)))
@@ -239,6 +245,26 @@ func (api *API) discardTicket(response http.ResponseWriter, request *http.Reques
 	writeJSON(response, http.StatusOK, map[string]any{"ticket": ticket})
 }
 
+func (api *API) fanStatus(response http.ResponseWriter, request *http.Request) {
+	writeJSON(response, http.StatusOK, map[string]any{"fan": api.service.FanStatus(currentUser(request))})
+}
+
+func (api *API) blowFan(response http.ResponseWriter, request *http.Request) {
+	var body fanBlowRequest
+	if err := decodeJSON(request, &body); err != nil {
+		api.writeError(response, request, service.ErrInvalidInput)
+		return
+	}
+	result, err := api.service.BlowFan(
+		request.Context(), currentUser(request), request.Header.Get("Idempotency-Key"), body.AcknowledgeRisk,
+	)
+	if err != nil {
+		api.writeError(response, request, err)
+		return
+	}
+	writeJSON(response, http.StatusOK, result)
+}
+
 func (api *API) robotStatus(response http.ResponseWriter, request *http.Request) {
 	status, err := api.service.RobotStatus(request.Context(), currentUser(request))
 	if err != nil {
@@ -370,6 +396,10 @@ func (api *API) writeError(response http.ResponseWriter, request *http.Request, 
 		writeAPIError(response, http.StatusConflict, "robot_managed", "这张卡正在机器人队列中")
 	case errors.Is(err, store.ErrRobotUnsupported):
 		writeAPIError(response, http.StatusConflict, "robot_unsupported", "《放手一博》只能手动刮奖")
+	case errors.Is(err, store.ErrFanRequired):
+		writeAPIError(response, http.StatusConflict, "fan_required", "请先在商店购买桌面清理风扇")
+	case errors.Is(err, store.ErrFanRiskRequired):
+		writeAPIError(response, http.StatusConflict, "fan_risk_required", "首次启动风扇前需要确认清理风险")
 	case errors.Is(err, store.ErrNotFound):
 		writeAPIError(response, http.StatusNotFound, "not_found", "没有找到对应内容")
 	case errors.Is(err, store.ErrInvalidState):
