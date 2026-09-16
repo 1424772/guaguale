@@ -4,7 +4,7 @@ import { DeskTicket, TicketResultSurface, type DeskPlacement } from './DeskTicke
 import { HistoryDialog } from './HistoryDialog'
 import { LeaderboardDialog } from './LeaderboardDialog'
 import { PlateCleaning } from './PlateCleaning'
-import { getSymbolVisual, ScratchCard, symbolClassName, symbolStateClassNames, TicketSymbolGlyph } from './ScratchCard'
+import { getSymbolVisual, scratchLayoutFor, ScratchCard, symbolClassName, symbolStateClassNames, TicketSymbolGlyph } from './ScratchCard'
 import { ShopDialog } from './ShopDialog'
 import { RobotDialog } from './RobotDialog'
 import { TicketScratchCoating } from './TicketScratchCoating'
@@ -388,7 +388,6 @@ export function App() {
       setTickets((current) => current.map((item) => item.id === response.ticket.id ? response.ticket : item))
       setActiveTicket((current) => current?.id === response.ticket.id ? response.ticket : current)
       rememberScratchProgress(ticketId, 100)
-      setScratchRequired(false)
       setScratchComplete(true)
     } catch (error) {
       setNotice(messageFrom(error))
@@ -1228,12 +1227,19 @@ function DailyTasksDialog({
 
 function ResultSymbols({ cardCode, cardName, symbols, prizeTier = 'none' }: { cardCode: string; cardName: string; symbols: string[]; prizeTier?: string }) {
   const tripleMatch = symbols.length === 3 && new Set(symbols).size === 1
+  const { stageHeight, cells } = scratchLayoutFor(cardCode, symbols.length)
   return (
     <div className={`result-ticket result-ticket-${cardCode} tier-${prizeTier} ${tripleMatch ? 'is-triple' : ''}`}>
       <span>{cardName}</span>
-      <div className={`result-symbols count-${symbols.length}`}>{symbols.map((symbol, index) => {
+      <div className={`result-symbols authored-result-layout count-${symbols.length}`}>{symbols.map((symbol, index) => {
         const visual = getSymbolVisual(symbol)
-        return <strong className={`symbol-${symbolClassName(symbol)} ${symbolStateClassNames(cardCode, symbols, index)}`} aria-label={visual.label} key={`${symbol}-${index}`}><TicketSymbolGlyph cardCode={cardCode} symbol={symbol} /><small>{symbol.replace('目标·', '目标：')}</small></strong>
+        const cell = cells[index]
+        return <strong
+          className={`symbol-${symbolClassName(symbol)} ${symbolStateClassNames(cardCode, symbols, index)}`}
+          aria-label={visual.label}
+          key={`${symbol}-${index}`}
+          style={{ left: `${cell.x / 7.2}%`, top: `${cell.y / stageHeight * 100}%`, width: `${cell.width / 7.2}%`, height: `${cell.height / stageHeight * 100}%` }}
+        ><TicketSymbolGlyph cardCode={cardCode} symbol={symbol} /><small>{symbol.replace('目标·', '目标：')}</small></strong>
       })}</div>
     </div>
   )

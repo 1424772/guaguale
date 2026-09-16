@@ -163,6 +163,17 @@ function getCellBounds(cardCode: string, count: number, columns: number, width: 
   }))
 }
 
+export function scratchLayoutFor(cardCode: string, symbolCount: number) {
+  const columns = cardCode === 'eternal-color-diamond' ? 5 : symbolCount === 9 ? 3 : symbolCount > 4 ? 4 : Math.max(symbolCount, 1)
+  const rows = Math.ceil(symbolCount / columns)
+  const stageHeight = cardCode === 'eternal-color-diamond' ? 190 : cardCode === 'all-in' ? 720 : rows <= 1 ? 220 : rows * 145
+  return {
+    columns,
+    stageHeight,
+    cells: getCellBounds(cardCode, symbolCount, columns, 720, stageHeight),
+  }
+}
+
 export function ScratchCard({ cardCode, cardName, symbols, scratchLevel, prizeTier = 'none', onComplete, onProgress }: ScratchCardProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const opaqueIndexesRef = useRef<number[][]>([])
@@ -173,14 +184,11 @@ export function ScratchCard({ cardCode, cardName, symbols, scratchLevel, prizeTi
   const moveCountRef = useRef(0)
   const [progress, setProgress] = useState(0)
   const [revealedIndexes, setRevealedIndexes] = useState<number[]>([])
-  const columns = cardCode === 'eternal-color-diamond' ? 5 : symbols.length === 9 ? 3 : symbols.length > 4 ? 4 : Math.max(symbols.length, 1)
-  const rows = Math.ceil(symbols.length / columns)
-  const stageHeight = cardCode === 'eternal-color-diamond' ? 190 : cardCode === 'all-in' ? 720 : rows <= 1 ? 220 : rows * 145
+  const { columns, stageHeight, cells: cellBounds } = scratchLayoutFor(cardCode, symbols.length)
   const revealThreshold = cardCode === 'all-in' ? 70 : 65
   const rangePercent = scratchEffects[Math.max(1, Math.min(10, scratchLevel))]
   const brushRadius = Math.max(6, stageHeight * rangePercent / 200)
   const tripleMatch = symbols.length === 3 && new Set(symbols).size === 1
-  const cellBounds = getCellBounds(cardCode, symbols.length, columns, 720, stageHeight)
 
   useEffect(() => {
     const canvas = canvasRef.current
