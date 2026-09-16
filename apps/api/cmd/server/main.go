@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"syscall"
 	"time"
+	_ "time/tzdata"
 
 	rediscache "github.com/1424772/guaguale/apps/api/internal/cache/redis"
 	"github.com/1424772/guaguale/apps/api/internal/httpapi"

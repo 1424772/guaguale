@@ -12,11 +12,11 @@ RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/server 
 
 FROM alpine:3.23
 
-RUN apk add --no-cache ca-certificates tzdata \
-    && addgroup -S app \
+RUN addgroup -S app \
     && adduser -S -G app app
 
 WORKDIR /app
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 COPY --from=builder /out/server /app/server
 
 USER app
