@@ -62,6 +62,25 @@ var deepSeaResults = []weightedResult{
 	{tier: "seaweed", base: 1000, maximum: 600, reward: 10000, symbol: "海草团"},
 }
 
+var diamondResults = []weightedResult{
+	{tier: "eternal", base: 150, maximum: 300, reward: 450000, symbol: "永恒级"},
+	{tier: "royal", base: 350, maximum: 600, reward: 270000, symbol: "皇室级"},
+	{tier: "collection", base: 600, maximum: 1100, reward: 180000, symbol: "典藏级"},
+	{tier: "selected", base: 1000, maximum: 1500, reward: 157500, symbol: "精选级"},
+	{tier: "rare", base: 1200, maximum: 1800, reward: 150000, symbol: "稀有级"},
+	{tier: "jewelry", base: 1800, maximum: 1800, reward: 120000, symbol: "珠宝级"},
+	{tier: "industrial", base: 2200, maximum: 1600, reward: 75000, symbol: "工业级"},
+	{tier: "cracked", base: 2700, maximum: 1300, reward: 30000, symbol: "裂纹级"},
+}
+
+var diamondGrades = []string{"裂纹级", "工业级", "珠宝级", "稀有级", "精选级", "典藏级", "皇室级", "永恒级"}
+
+const (
+	allInAngelWeight  = 1
+	allInScytheWeight = 100
+	allInSkullWeight  = 99899
+)
+
 func Draw(cardCode string, luckLevel uint8) (domain.Outcome, error) {
 	switch cardCode {
 	case FirstCardCode:
@@ -76,9 +95,58 @@ func Draw(cardCode string, luckLevel uint8) (domain.Outcome, error) {
 		return drawRocket(luckLevel)
 	case "deep-sea-salvage":
 		return drawDeepSea(luckLevel)
+	case "eternal-color-diamond":
+		return drawEternalColorDiamond(luckLevel)
+	case "all-in":
+		return drawAllIn()
 	default:
 		return domain.Outcome{}, fmt.Errorf("unsupported card code %q", cardCode)
 	}
+}
+
+func drawEternalColorDiamond(luckLevel uint8) (domain.Outcome, error) {
+	selected, err := chooseWeighted(diamondResults, luckLevel)
+	if err != nil {
+		return domain.Outcome{}, err
+	}
+	minimumIndex := 0
+	for index, grade := range diamondGrades {
+		if grade == selected.symbol {
+			minimumIndex = index
+			break
+		}
+	}
+	symbols := []string{selected.symbol}
+	for len(symbols) < 5 {
+		index, err := randomInt(len(diamondGrades) - minimumIndex)
+		if err != nil {
+			return domain.Outcome{}, err
+		}
+		symbols = append(symbols, diamondGrades[minimumIndex+index])
+	}
+	if err := shuffle(symbols); err != nil {
+		return domain.Outcome{}, err
+	}
+	return domain.Outcome{PrizeTier: selected.tier, Reward: selected.reward, Symbols: symbols}, nil
+}
+
+// AllInOdds deliberately ignores luckLevel: this card's odds never change.
+func AllInOdds(_ uint8) map[string]int {
+	return map[string]int{"angel": allInAngelWeight, "scythe": allInScytheWeight, "skull": allInSkullWeight}
+}
+
+func drawAllIn() (domain.Outcome, error) {
+	roll, err := randomInt(100000)
+	if err != nil {
+		return domain.Outcome{}, err
+	}
+	if roll < allInAngelWeight {
+		return domain.Outcome{PrizeTier: "angel", Reward: 3000000, Symbols: []string{"天使"}}, nil
+	}
+	if roll < allInAngelWeight+allInScytheWeight {
+		return domain.Outcome{PrizeTier: "scythe", Reward: 300000, Symbols: []string{"镰刀"}}, nil
+	}
+	return domain.Outcome{PrizeTier: "skull", Symbols: []string{"骷髅头"}}, nil
 }
 
 func drawStreetStore(luckLevel uint8) (domain.Outcome, error) {

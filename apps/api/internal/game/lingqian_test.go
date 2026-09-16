@@ -73,14 +73,16 @@ func TestWheelPoolUsesConfirmedEligibilityAndWeights(t *testing.T) {
 	}
 }
 
-func TestAllWheelCardsProduceValidSymbolCounts(t *testing.T) {
+func TestAllCardsProduceValidSymbolCounts(t *testing.T) {
 	expectedCounts := map[string]int{
-		"lingqian-ticket":  3,
-		"street-store":     7,
-		"arcade-challenge": 9,
-		"gold-mine":        7,
-		"rocket-launch":    4,
-		"deep-sea-salvage": 8,
+		"lingqian-ticket":       3,
+		"street-store":          7,
+		"arcade-challenge":      9,
+		"gold-mine":             7,
+		"rocket-launch":         4,
+		"deep-sea-salvage":      8,
+		"eternal-color-diamond": 5,
+		"all-in":                1,
 	}
 	for code, count := range expectedCounts {
 		for index := 0; index < 40; index++ {
@@ -91,6 +93,61 @@ func TestAllWheelCardsProduceValidSymbolCounts(t *testing.T) {
 			if len(outcome.Symbols) != count {
 				t.Fatalf("%s: expected %d symbols, got %#v", code, count, outcome.Symbols)
 			}
+		}
+	}
+}
+
+func TestEternalColorDiamondFinalGradeIsLowestAppraisal(t *testing.T) {
+	gradeIndex := map[string]int{}
+	for index, grade := range diamondGrades {
+		gradeIndex[grade] = index
+	}
+	tierGrade := map[string]string{
+		"cracked": "裂纹级", "industrial": "工业级", "jewelry": "珠宝级", "rare": "稀有级",
+		"selected": "精选级", "collection": "典藏级", "royal": "皇室级", "eternal": "永恒级",
+	}
+	for level := uint8(0); level <= 10; level++ {
+		for attempt := 0; attempt < 80; attempt++ {
+			outcome, err := Draw("eternal-color-diamond", level)
+			if err != nil {
+				t.Fatal(err)
+			}
+			minimum := len(diamondGrades)
+			for _, symbol := range outcome.Symbols {
+				if gradeIndex[symbol] < minimum {
+					minimum = gradeIndex[symbol]
+				}
+			}
+			if diamondGrades[minimum] != tierGrade[outcome.PrizeTier] {
+				t.Fatalf("tier %s does not match lowest appraisal: %#v", outcome.PrizeTier, outcome.Symbols)
+			}
+		}
+	}
+}
+
+func TestAllInOddsIgnoreEveryLuckLevel(t *testing.T) {
+	for level := uint8(0); level <= 10; level++ {
+		odds := AllInOdds(level)
+		if odds["angel"] != 1 || odds["scythe"] != 100 || odds["skull"] != 99899 {
+			t.Fatalf("luck level %d changed all-in odds: %#v", level, odds)
+		}
+		if odds["angel"]+odds["scythe"]+odds["skull"] != 100000 {
+			t.Fatalf("luck level %d odds are not normalized: %#v", level, odds)
+		}
+	}
+	expectedReward := (int64(allInAngelWeight)*3000000 + int64(allInScytheWeight)*300000) / 100000
+	if expectedReward != 330 {
+		t.Fatalf("all-in expected reward = %d, want 330", expectedReward)
+	}
+}
+
+func TestAllEightCardsAreImplemented(t *testing.T) {
+	if len(catalog) != 8 {
+		t.Fatalf("catalog has %d cards, want 8", len(catalog))
+	}
+	for _, card := range catalog {
+		if !card.Implemented {
+			t.Fatalf("card %s is not enabled", card.Code)
 		}
 	}
 }

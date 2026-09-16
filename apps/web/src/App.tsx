@@ -2,7 +2,7 @@ import { FormEvent, KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPo
 import { ApiError, api, type Card, type DailyStatus, type FanCardEvent, type FanStatus, type RobotStatus, type ShopItem, type ShopStatus, type Ticket, type User } from './api'
 import { DeskTicket, type DeskPlacement } from './DeskTicket'
 import { PlateCleaning } from './PlateCleaning'
-import { ScratchCard } from './ScratchCard'
+import { getSymbolVisual, ScratchCard, symbolClassName } from './ScratchCard'
 import { ShopDialog } from './ShopDialog'
 import { RobotDialog } from './RobotDialog'
 import ticketArtwork from './assets/concepts/lingqian-ticket-play-v1.webp'
@@ -750,14 +750,16 @@ export function App() {
           <section className="scratch-dialog" role="dialog" aria-modal="true" aria-label="刮奖">
             <button className="close-button" type="button" onClick={() => setActiveTicket(null)} aria-label="关闭">×</button>
             {scratchRequired ? (
-              <ScratchCard cardName={activeTicket.cardName} symbols={activeTicket.symbols ?? []} scratchLevel={user.scratchLevel} onComplete={() => setScratchComplete(true)} />
+              <ScratchCard cardCode={activeTicket.cardCode} cardName={activeTicket.cardName} symbols={activeTicket.symbols ?? []} scratchLevel={user.scratchLevel} onComplete={() => setScratchComplete(true)} />
             ) : (
-              <ResultSymbols cardName={activeTicket.cardName} symbols={activeTicket.symbols ?? []} />
+              <ResultSymbols cardCode={activeTicket.cardCode} cardName={activeTicket.cardName} symbols={activeTicket.symbols ?? []} />
             )}
+            {activeTicket.cardCode === 'eternal-color-diamond' && <p className="special-card-rule">五项鉴定中，以最低等级作为本张彩钻的最终等级。</p>}
+            {activeTicket.cardCode === 'all-in' && <p className="special-card-rule danger">固定结果规则 · 好运道具无效 · 机器人禁用 · 仅可手动刮开</p>}
             {scratchComplete && (
               <div className={`result-box ${activeTicket.reward ? 'winner' : 'loser'}`}>
                 <small>本张结果</small>
-                <h2>{activeTicket.reward ? `获得 ${coinFormatter.format(activeTicket.reward)} 金币` : '未中奖'}</h2>
+                <h2>{ticketResultTitle(activeTicket)}</h2>
                 <p>{activeTicket.reward ? '把中奖卡放入兑奖区即可入账。' : '未中奖卡将继续留在桌面，后续可丢入垃圾桶。'}</p>
                 {activeTicket.state === 'scratched' && Boolean(activeTicket.reward) && (
                   <button type="button" className="gold-button" onClick={redeem} disabled={busy}>拖入兑奖区 · 立即兑奖</button>
@@ -999,24 +1001,29 @@ function DailyTasksDialog({
   )
 }
 
-function ResultSymbols({ cardName, symbols }: { cardName: string; symbols: string[] }) {
-  const emoji: Record<string, string> = {
-    '狗头金币': '🐶', '钞票': '💵', '碎钻石': '💎', '钞票堆': '💰',
-    '辣条': '🌶️', '可乐': '🥤', '冰棍': '🧊', '雪糕': '🍦', '玩具车': '🚗', '小电视': '📺', '游戏机': '🎮',
-    '弹珠': '🔵', '拳套': '🥊', '赛车': '🏎️', '飞机': '✈️', '街机皇冠': '👑',
-    '青晶簇': '🔷', '红晶簇': '🔶', '紫晶簇': '💜', '金色矿石': '🪨',
-    '海神王冠': '👑', '黄金宝箱': '🧰', '珍珠贝': '🦪', '生锈船锚': '⚓', '漂流瓶': '🍾', '破皮靴': '🥾', '海草团': '🌿', '空网': '🕸️',
-  }
+function ResultSymbols({ cardCode, cardName, symbols }: { cardCode: string; cardName: string; symbols: string[] }) {
   return (
-    <div className="result-ticket">
+    <div className={`result-ticket result-ticket-${cardCode}`}>
       <span>{cardName}</span>
       <div className={`result-symbols count-${symbols.length}`}>{symbols.map((symbol, index) => {
-        const baseSymbol = symbol.replace(/^目标·/, '')
-        const fuelValue = symbol.match(/^燃料 (\d)$/)?.[1]
-        return <strong key={`${symbol}-${index}`}>{fuelValue ? `⛽${fuelValue}` : emoji[baseSymbol] ?? '✦'}<small>{symbol.replace('目标·', '目标：')}</small></strong>
+        const visual = getSymbolVisual(symbol)
+        return <strong className={`symbol-${symbolClassName(symbol)}`} aria-label={visual.label} key={`${symbol}-${index}`}>{visual.emoji}<small>{symbol.replace('目标·', '目标：')}</small></strong>
       })}</div>
     </div>
   )
+}
+
+function ticketResultTitle(ticket: Ticket) {
+  if (ticket.cardCode === 'eternal-color-diamond') {
+    const grades = ['裂纹级', '工业级', '珠宝级', '稀有级', '精选级', '典藏级', '皇室级', '永恒级']
+    const finalGrade = (ticket.symbols ?? []).reduce((lowest, grade) => grades.indexOf(grade) < grades.indexOf(lowest) ? grade : lowest, '永恒级')
+    return `最终鉴定 ${finalGrade} · 获得 ${coinFormatter.format(ticket.reward ?? 0)} 金币`
+  }
+  if (ticket.cardCode === 'all-in') {
+    const symbol = ticket.symbols?.[0] ?? '骷髅头'
+    return ticket.reward ? `${symbol} · 获得 ${coinFormatter.format(ticket.reward)} 金币` : `${symbol} · 未中奖`
+  }
+  return ticket.reward ? `获得 ${coinFormatter.format(ticket.reward)} 金币` : '未中奖'
 }
 
 function messageFrom(error: unknown) {

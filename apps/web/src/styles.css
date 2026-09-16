@@ -309,12 +309,15 @@ button { color: inherit; }
 .ticket-pin:hover, .ticket-pin:focus-visible { background: rgba(255,255,255,.48); outline: none; }
 .ticket-robot { position: absolute; right: 74px; top: 7px; min-height: 24px; padding: 2px 8px; border: 1px solid rgba(39,67,46,.42); border-radius: 99px; color: inherit; background: rgba(255,255,255,.26); font-size: 10px; font-weight: 900; cursor: pointer; }
 .ticket-robot:hover, .ticket-robot:focus-visible { background: rgba(255,255,255,.48); outline: none; }
+.ticket-robot.disabled { opacity: .72; cursor: not-allowed; }
 .drag-grip { position: absolute; right: 8px; top: 6px; opacity: .4; font-style: normal; }
 .movable-ticket.card-street-store { background: linear-gradient(145deg, #f1b76d, #f6e0a4 60%, #d37b4f); }
 .movable-ticket.card-arcade-challenge { color: #ece6ff; background: linear-gradient(145deg, #4c3f8d, #9b4b92 55%, #283b73); }
 .movable-ticket.card-gold-mine { color: #3c2a12; background: linear-gradient(145deg, #ad7a35, #f1d783 58%, #7c5525); }
 .movable-ticket.card-rocket-launch { color: #e9f2ff; background: linear-gradient(145deg, #243866, #7089b3 58%, #192747); }
 .movable-ticket.card-deep-sea-salvage { color: #e7f6ef; background: linear-gradient(145deg, #174c58, #428e88 55%, #153d4c); }
+.movable-ticket.card-eternal-color-diamond { color: #39405e; border-color: #f4e9ff; background: radial-gradient(circle at 72% 22%, rgba(255,255,255,.95), transparent 22%), linear-gradient(128deg, #f5e6ff, #d9f2ff 32%, #fff 55%, #f6dce9 77%, #d9e8ff); box-shadow: 0 15px 25px rgba(178,201,239,.46), inset 0 0 16px rgba(255,255,255,.72); }
+.movable-ticket.card-all-in { color: #eee4d2; border-color: #8a6b45; background: radial-gradient(circle at 50% 45%, rgba(132,20,23,.38), transparent 36%), linear-gradient(145deg, #30251f, #0b0b0d 58%, #2c1717); box-shadow: 0 15px 28px rgba(0,0,0,.62), inset 0 0 16px rgba(152,87,46,.18); }
 
 .fixed-slot-panel { position: sticky; z-index: 1; top: 84px; margin: 0 0 16px; padding: 16px; border: 1px solid #6f5b37; border-radius: 15px; background: linear-gradient(145deg, rgba(16,45,37,.98), rgba(7,26,22,.98)); box-shadow: 0 16px 28px rgba(0,0,0,.32); }
 .fixed-slot-heading { display: flex; align-items: end; justify-content: space-between; margin-bottom: 12px; }
@@ -377,6 +380,34 @@ button { color: inherit; }
 .scratch-progress { height: 5px; overflow: hidden; border-radius: 99px; background: rgba(255,255,255,.08); }
 .scratch-progress span { display: block; height: 100%; border-radius: inherit; background: #dab353; transition: width .18s; }
 .scratch-card > p { margin: 0; color: #9c9a88; font-size: 13px; text-align: center; }
+.scratch-card-eternal-color-diamond .ticket-heading { color: #39405e; background: linear-gradient(120deg, #f8eaff, #dff5ff 36%, #fff 62%, #f4dfec); }
+.scratch-card-eternal-color-diamond .scratch-stage { border-color: #eadfff; background: radial-gradient(circle at 50% 5%, rgba(255,255,255,.95), transparent 28%), linear-gradient(130deg, #eadcff, #d7efff 36%, #fff 60%, #f1d9e9); box-shadow: inset 0 0 34px rgba(157,187,239,.32), 0 0 30px rgba(205,189,255,.18); }
+.scratch-card-eternal-color-diamond .symbol { position: relative; border-right-color: rgba(91,92,137,.2); }
+.scratch-card-eternal-color-diamond .symbol::before { content: ""; position: absolute; inset: 15% 11%; border: 1px solid rgba(255,255,255,.84); border-radius: 16px; box-shadow: inset 0 0 14px rgba(102,139,206,.16); }
+.scratch-card-eternal-color-diamond .symbol span, .result-ticket-eternal-color-diamond strong { position: relative; color: #69719d; text-shadow: 0 0 10px #fff, 0 0 18px rgba(140,181,255,.72); animation: diamond-breathe 2.8s ease-in-out infinite; }
+.scratch-card-eternal-color-diamond .symbol small { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+.symbol-cracked span, .result-ticket .symbol-cracked { opacity: .62; filter: grayscale(.55); }
+.symbol-industrial span, .result-ticket .symbol-industrial { color: #6f7791; }
+.symbol-jewelry span, .result-ticket .symbol-jewelry { color: #639dcc; }
+.symbol-rare span, .result-ticket .symbol-rare { color: #8876c9; }
+.symbol-selected span, .result-ticket .symbol-selected { color: #b37ac7; }
+.symbol-collection span, .result-ticket .symbol-collection { color: #cf8cbd; }
+.symbol-royal span, .result-ticket .symbol-royal { color: #d2a847; }
+.symbol-eternal span, .result-ticket .symbol-eternal { color: #8469d8; animation: diamond-eternal 1.8s ease-in-out infinite; }
+@keyframes diamond-breathe { 50% { transform: translateY(-2px) scale(1.045); filter: brightness(1.16); } }
+@keyframes diamond-eternal { 50% { transform: scale(1.12) rotate(2deg); text-shadow: 0 0 8px #fff, 0 0 20px #8bdcff, 0 0 30px #eaaeff; } }
+.scratch-card-all-in .ticket-heading { color: #eee3ce; background: linear-gradient(110deg, #493526, #151315 58%, #4c2023); }
+.scratch-card-all-in .scratch-stage { border-color: #7a5a38; background: radial-gradient(circle at center, #4b171b 0, #171113 39%, #060708 72%); box-shadow: inset 0 0 70px #000, 0 0 28px rgba(126,31,34,.22); }
+.scratch-card-all-in .symbols { place-items: center; }
+.scratch-card-all-in .symbol { width: 230px; height: 230px; border: 1px solid rgba(179,131,76,.38); border-radius: 50%; background: radial-gradient(circle, rgba(131,41,43,.3), rgba(0,0,0,.55)); }
+.scratch-card-all-in .symbol span { font-size: 96px; animation: all-in-reveal .72s cubic-bezier(.17,.84,.35,1) both; }
+.scratch-card-all-in .symbol small { color: #d5c3a4; letter-spacing: .18em; }
+.scratch-card-all-in .symbol-skull span { filter: grayscale(1); text-shadow: 0 0 22px rgba(255,255,255,.28); }
+.scratch-card-all-in .symbol-scythe span { text-shadow: 0 0 22px rgba(211,164,84,.6); }
+.scratch-card-all-in .symbol-angel span { text-shadow: 0 0 18px #fff, 0 0 38px #e8cb78; }
+@keyframes all-in-reveal { from { opacity: 0; transform: scale(.42) rotate(-12deg); } 70% { transform: scale(1.09) rotate(2deg); } to { opacity: 1; transform: scale(1); } }
+.special-card-rule { margin: 12px 0 0; padding: 10px 14px; border: 1px solid rgba(184,175,224,.24); border-radius: 10px; color: #c8c1db; background: rgba(117,101,164,.11); text-align: center; }
+.special-card-rule.danger { border-color: rgba(175,79,66,.35); color: #d2b8a8; background: rgba(104,28,28,.16); }
 .result-box { margin-top: 20px; padding: 22px; border: 1px solid rgba(220,182,88,.28); border-radius: 14px; text-align: center; background: rgba(0,0,0,.16); }
 .result-box small { color: #a9a58f; }
 .result-box h2 { margin: 7px 0; font-family: Georgia, "Songti SC", serif; font-size: 30px; }
@@ -389,8 +420,16 @@ button { color: inherit; }
 .result-ticket > div { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 20px; }
 .result-ticket .count-4, .result-ticket .count-7, .result-ticket .count-8 { grid-template-columns: repeat(4, 1fr); }
 .result-ticket .count-9 { grid-template-columns: repeat(3, 1fr); }
+.result-ticket .count-5 { grid-template-columns: repeat(5, 1fr); }
 .result-ticket strong { display: grid; place-items: center; gap: 5px; min-height: 130px; border: 1px dashed #718367; border-radius: 8px; font-size: 54px; }
 .result-ticket small { font-size: 12px; }
+.result-ticket-eternal-color-diamond { color: #3d456a; border-color: #eadfff; background: linear-gradient(130deg, #eadcff, #d7efff 36%, #fff 60%, #f1d9e9); }
+.result-ticket-eternal-color-diamond strong { border-color: rgba(91,92,137,.3); font-family: Georgia, serif; }
+.result-ticket-eternal-color-diamond strong small { display: none; }
+.result-ticket-all-in { color: #eee3ce; border-color: #7a5a38; background: radial-gradient(circle at center, #4b171b, #0a090b 62%); }
+.result-ticket-all-in > div { grid-template-columns: 1fr; }
+.result-ticket-all-in strong { min-height: 230px; border-color: rgba(179,131,76,.38); border-radius: 50%; font-size: 96px; animation: all-in-reveal .72s cubic-bezier(.17,.84,.35,1) both; }
+.result-ticket-all-in small { color: #d5c3a4; }
 
 .daily-dialog {
   position: relative;

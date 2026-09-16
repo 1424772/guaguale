@@ -115,14 +115,14 @@ export function DeskTicket({ ticket, deskRef, topZ, onOpen, onPin, onRobot, fanA
       >固定</button>
       {ticket.state === 'purchased' && <button
         type="button"
-        className="ticket-robot"
+        className={`ticket-robot ${ticket.cardCode === 'all-in' ? 'disabled' : ''}`}
         aria-label={`将${ticket.cardName}交给机器人`}
         onPointerDown={(event) => event.stopPropagation()}
         onClick={(event) => {
           event.stopPropagation()
-          onRobot(ticket)
+          if (ticket.cardCode !== 'all-in') onRobot(ticket)
         }}
-      >机器人</button>}
+      >{ticket.cardCode === 'all-in' ? '仅手动' : '机器人'}</button>}
       <i className="drag-grip" aria-hidden="true">⠿</i>
     </article>
   )

@@ -56,8 +56,8 @@ func (store *Store) BlowFan(_ context.Context, input basestore.BlowFanInput) (do
 		if ticket.State == domain.TicketScratched {
 			action = "discarded"
 		} else {
-			intercepted := record.user.RobotOwned && roll(input.Roll, 100) < input.InterceptPercent
-			if intercepted && ticket.CardCode != "all-in" && len(queue) < input.RobotCapacity {
+			intercepted := ticket.CardCode != "all-in" && record.user.RobotOwned && roll(input.Roll, 100) < input.InterceptPercent
+			if intercepted && len(queue) < input.RobotCapacity {
 				ticket.Location = domain.TicketInRobot
 				ticket.SlotIndex = nil
 				queue = append(queue, robotJob{ticketID: ticket.ID, remainingMS: input.RobotDurationMS, enqueuedAt: input.Now})

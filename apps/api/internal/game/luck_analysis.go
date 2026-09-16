@@ -14,7 +14,7 @@ func LuckCardImpacts(currentLevel uint8) []domain.LuckCardImpact {
 	if nextLevel < 10 {
 		nextLevel++
 	}
-	impacts := make([]domain.LuckCardImpact, 0, 6)
+	impacts := make([]domain.LuckCardImpact, 0, 7)
 	impacts = append(impacts, lingqianImpact(currentLevel, nextLevel))
 	definitions := []struct {
 		card    domain.Card
@@ -25,6 +25,7 @@ func LuckCardImpacts(currentLevel uint8) []domain.LuckCardImpact {
 		{catalog[3], goldMineResults},
 		{catalog[4], rocketResults},
 		{catalog[5], deepSeaResults},
+		{catalog[6], diamondResults},
 	}
 	for _, definition := range definitions {
 		currentWeights := resultWeights(definition.results, currentLevel)

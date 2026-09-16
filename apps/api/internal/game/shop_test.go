@@ -37,10 +37,10 @@ func TestShopPricesEffectsAndRelocking(t *testing.T) {
 
 func TestLuckCardImpactsMatchBaseConfiguration(t *testing.T) {
 	impacts := LuckCardImpacts(0)
-	if len(impacts) != 6 {
-		t.Fatalf("expected six implemented luck cards, got %#v", impacts)
+	if len(impacts) != 7 {
+		t.Fatalf("expected seven implemented luck cards, got %#v", impacts)
 	}
-	wantRTP := []int{7560, 6880, 7260, 7030, 7200, 6880}
+	wantRTP := []int{7560, 6880, 7260, 7030, 7200, 6880, 7130}
 	for index, impact := range impacts {
 		if impact.CurrentRTPBasisPoint != wantRTP[index] {
 			t.Fatalf("%s RTP = %d, want %d", impact.CardName, impact.CurrentRTPBasisPoint, wantRTP[index])
@@ -53,5 +53,9 @@ func TestLuckCardImpactsMatchBaseConfiguration(t *testing.T) {
 		if currentTotal != 10000 || nextTotal != 10000 {
 			t.Fatalf("%s probabilities do not sum to 100%%: %d/%d", impact.CardName, currentTotal, nextTotal)
 		}
+	}
+	maxImpacts := LuckCardImpacts(10)
+	if maxImpacts[6].CurrentRTPBasisPoint != 9175 {
+		t.Fatalf("max-luck diamond RTP = %d, want 9175", maxImpacts[6].CurrentRTPBasisPoint)
 	}
 }

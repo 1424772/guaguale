@@ -112,8 +112,8 @@ func (store *Store) BlowFan(ctx context.Context, input basestore.BlowFanInput) (
 		if ticket.State == domain.TicketScratched {
 			action = "discarded"
 		} else {
-			intercepted := user.RobotOwned && fanRoll(input.Roll, 100) < input.InterceptPercent
-			if intercepted && ticket.CardCode != "all-in" && queueCount < input.RobotCapacity {
+			intercepted := ticket.CardCode != "all-in" && user.RobotOwned && fanRoll(input.Roll, 100) < input.InterceptPercent
+			if intercepted && queueCount < input.RobotCapacity {
 				if _, err := tx.ExecContext(ctx, `
 					INSERT INTO robot_queue (user_id, ticket_id, remaining_ms, enqueued_at) VALUES (?, ?, ?, ?)`,
 					user.ID, ticket.ID, input.RobotDurationMS, input.Now.UTC()); err != nil {

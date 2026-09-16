@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 
 type ScratchCardProps = {
+  cardCode: string
   cardName: string
   symbols: string[]
   scratchLevel: number
@@ -38,18 +39,50 @@ const symbolVisuals: Record<string, { emoji: string; label: string }> = {
   '破皮靴': { emoji: '🥾', label: '破皮靴' },
   '海草团': { emoji: '🌿', label: '海草团' },
   '空网': { emoji: '🕸️', label: '空网' },
+  '裂纹级': { emoji: '♢', label: '裂纹级' },
+  '工业级': { emoji: '◆', label: '工业级' },
+  '珠宝级': { emoji: '◈', label: '珠宝级' },
+  '稀有级': { emoji: '◎', label: '稀有级' },
+  '精选级': { emoji: '✦', label: '精选级' },
+  '典藏级': { emoji: '♜', label: '典藏级' },
+  '皇室级': { emoji: '♛', label: '皇室级' },
+  '永恒级': { emoji: '∞', label: '永恒级' },
+  '骷髅头': { emoji: '☠️', label: '骷髅头' },
+  '镰刀': { emoji: '⚔️', label: '镰刀' },
+  '天使': { emoji: '🪽', label: '天使' },
 }
 
-export function ScratchCard({ cardName, symbols, scratchLevel, onComplete }: ScratchCardProps) {
+const diamondAppraisals = ['重量', '切工', '净度', '火彩', '稀有度']
+
+export function getSymbolVisual(symbol: string) {
+  const baseSymbol = symbol.replace(/^目标·/, '')
+  const fuelValue = symbol.match(/^燃料 (\d)$/)?.[1]
+  return fuelValue
+    ? { emoji: `⛽${fuelValue}`, label: symbol }
+    : symbolVisuals[baseSymbol] ?? { emoji: '✦', label: symbol }
+}
+
+export function symbolClassName(symbol: string) {
+  const names: Record<string, string> = {
+    '裂纹级': 'cracked', '工业级': 'industrial', '珠宝级': 'jewelry', '稀有级': 'rare',
+    '精选级': 'selected', '典藏级': 'collection', '皇室级': 'royal', '永恒级': 'eternal',
+    '骷髅头': 'skull', '镰刀': 'scythe', '天使': 'angel',
+  }
+  return names[symbol] ?? 'standard'
+}
+
+export function ScratchCard({ cardCode, cardName, symbols, scratchLevel, onComplete }: ScratchCardProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const opaqueIndexesRef = useRef<number[]>([])
   const drawingRef = useRef(false)
   const completedRef = useRef(false)
   const lastPointRef = useRef<{ x: number; y: number } | null>(null)
   const moveCountRef = useRef(0)
   const [progress, setProgress] = useState(0)
-  const columns = symbols.length === 9 ? 3 : symbols.length > 4 ? 4 : Math.max(symbols.length, 1)
+  const columns = cardCode === 'eternal-color-diamond' ? 5 : symbols.length === 9 ? 3 : symbols.length > 4 ? 4 : Math.max(symbols.length, 1)
   const rows = Math.ceil(symbols.length / columns)
-  const stageHeight = rows <= 1 ? 220 : rows * 145
+  const stageHeight = cardCode === 'eternal-color-diamond' ? 190 : cardCode === 'all-in' ? 270 : rows <= 1 ? 220 : rows * 145
+  const revealThreshold = cardCode === 'all-in' ? 70 : cardCode === 'eternal-color-diamond' ? 65 : 45
   const rangePercent = scratchEffects[Math.max(1, Math.min(10, scratchLevel))]
   const brushRadius = Math.max(6, stageHeight * rangePercent / 200)
 
@@ -64,6 +97,8 @@ export function ScratchCard({ cardName, symbols, scratchLevel, onComplete }: Scr
     const context = canvas.getContext('2d', { willReadFrequently: true })
     if (!context) return
     completedRef.current = false
+    moveCountRef.current = 0
+    opaqueIndexesRef.current = []
     setProgress(0)
     context.scale(ratio, ratio)
     const gradient = context.createLinearGradient(0, 0, width, height)
@@ -71,13 +106,40 @@ export function ScratchCard({ cardName, symbols, scratchLevel, onComplete }: Scr
     gradient.addColorStop(0.45, '#a7a8a5')
     gradient.addColorStop(1, '#e7e2d4')
     context.fillStyle = gradient
-    context.fillRect(0, 0, width, height)
-    context.fillStyle = 'rgba(60, 65, 66, .38)'
-    context.font = '700 26px system-ui'
     context.textAlign = 'center'
-    context.fillText('按住并刮开', width / 2, height / 2 + 8)
+    if (cardCode === 'eternal-color-diamond') {
+      const gap = 12
+      const margin = 18
+      const cellWidth = (width - margin * 2 - gap * 4) / 5
+      diamondAppraisals.forEach((label, index) => {
+        const x = margin + index * (cellWidth + gap)
+        context.beginPath()
+        context.roundRect(x, 18, cellWidth, height - 36, 13)
+        context.fill()
+        context.fillStyle = 'rgba(53, 55, 72, .58)'
+        context.font = '700 18px system-ui'
+        context.fillText(label, x + cellWidth / 2, height / 2 + 6)
+        context.fillStyle = gradient
+      })
+    } else if (cardCode === 'all-in') {
+      context.beginPath()
+      context.arc(width / 2, height / 2, 105, 0, Math.PI * 2)
+      context.fill()
+      context.fillStyle = 'rgba(44, 26, 25, .68)'
+      context.font = '800 24px system-ui'
+      context.fillText('最终抉择', width / 2, height / 2 + 8)
+    } else {
+      context.fillRect(0, 0, width, height)
+      context.fillStyle = 'rgba(60, 65, 66, .38)'
+      context.font = '700 26px system-ui'
+      context.fillText('按住并刮开', width / 2, height / 2 + 8)
+    }
+    const initialPixels = context.getImageData(0, 0, canvas.width, canvas.height).data
+    for (let index = 3; index < initialPixels.length; index += 4 * 24) {
+      if (initialPixels[index] >= 64) opaqueIndexesRef.current.push(index)
+    }
     context.globalCompositeOperation = 'destination-out'
-  }, [stageHeight])
+  }, [cardCode, stageHeight])
 
   function scratch(event: React.PointerEvent<HTMLCanvasElement>) {
     if (!drawingRef.current || completedRef.current) return
@@ -103,14 +165,13 @@ export function ScratchCard({ cardName, symbols, scratchLevel, onComplete }: Scr
   function measureProgress(context: CanvasRenderingContext2D, canvas: HTMLCanvasElement) {
     const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data
     let transparent = 0
-    let sampled = 0
-    for (let index = 3; index < pixels.length; index += 4 * 24) {
-      sampled++
+    const sampled = opaqueIndexesRef.current.length
+    for (const index of opaqueIndexesRef.current) {
       if (pixels[index] < 64) transparent++
     }
-    const nextProgress = Math.round((transparent / sampled) * 100)
+    const nextProgress = sampled ? Math.round((transparent / sampled) * 100) : 0
     setProgress(nextProgress)
-    if (nextProgress >= 45) finish(context, canvas)
+    if (nextProgress >= revealThreshold) finish(context, canvas)
   }
 
   function finish(context: CanvasRenderingContext2D, canvas: HTMLCanvasElement) {
@@ -122,21 +183,17 @@ export function ScratchCard({ cardName, symbols, scratchLevel, onComplete }: Scr
   }
 
   return (
-    <div className="scratch-card">
+    <div className={`scratch-card scratch-card-${cardCode}`}>
       <div className="ticket-heading">
           <span>{cardName}</span>
-          <strong>{symbols.length} 格刮奖区域</strong>
+          <strong>{cardCode === 'eternal-color-diamond' ? '五项彩钻鉴定' : cardCode === 'all-in' ? '唯一终局刮层' : `${symbols.length} 格刮奖区域`}</strong>
         </div>
       <div className="scratch-stage" style={{ aspectRatio: `720 / ${stageHeight}` }}>
         <div className="symbols" aria-hidden={!completedRef.current} style={{ gridTemplateColumns: `repeat(${columns}, 1fr)` }}>
           {symbols.map((symbol, index) => {
-            const baseSymbol = symbol.replace(/^目标·/, '')
-            const fuelValue = symbol.match(/^燃料 (\d)$/)?.[1]
-            const visual = fuelValue
-              ? { emoji: `⛽${fuelValue}`, label: symbol }
-              : symbolVisuals[baseSymbol] ?? { emoji: '✦', label: symbol }
+            const visual = getSymbolVisual(symbol)
             return (
-              <div className="symbol" key={`${symbol}-${index}`}>
+              <div className={`symbol symbol-${symbolClassName(symbol)}`} key={`${symbol}-${index}`} aria-label={visual.label}>
                 <span>{visual.emoji}</span>
                 <small>{symbol.startsWith('目标·') ? `目标：${visual.label}` : visual.label}</small>
               </div>
@@ -166,7 +223,7 @@ export function ScratchCard({ cardName, symbols, scratchLevel, onComplete }: Scr
       <div className="scratch-progress" aria-live="polite">
         <span style={{ width: `${progress}%` }} />
       </div>
-      <p>刮片 Lv.{scratchLevel} · 单次完整划动参考覆盖 {rangePercent}% · 刮开45%后揭晓</p>
+      <p>{cardCode === 'all-in' ? '好运道具无效 · 机器人禁用 · ' : `刮片 Lv.${scratchLevel} · 单次完整划动参考覆盖 ${rangePercent}% · `}刮开{revealThreshold}%后揭晓</p>
     </div>
   )
 }

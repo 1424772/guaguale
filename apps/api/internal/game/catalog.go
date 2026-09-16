@@ -11,8 +11,8 @@ var catalog = []domain.Card{
 	{Code: "gold-mine", Name: "黄金矿洞", Price: 15000, Implemented: true},
 	{Code: "rocket-launch", Name: "火箭发射", Price: 40000, Implemented: true},
 	{Code: "deep-sea-salvage", Name: "深海打捞", Price: 80000, Implemented: true},
-	{Code: "eternal-color-diamond", Name: "永恒彩钻", Price: 150000},
-	{Code: "all-in", Name: "放手一博", Price: 300000},
+	{Code: "eternal-color-diamond", Name: "永恒彩钻", Price: 150000, Implemented: true},
+	{Code: "all-in", Name: "放手一博", Price: 300000, Implemented: true},
 }
 
 func WheelCatalog(balance int64) []domain.Card {
