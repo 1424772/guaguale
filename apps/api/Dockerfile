@@ -1,5 +1,8 @@
 FROM golang:1.26-alpine AS builder
 
+ARG GOPROXY=https://proxy.golang.org,direct
+ENV GOPROXY=${GOPROXY}
+
 WORKDIR /workspace
 COPY apps/api/go.mod apps/api/go.sum ./
 RUN go mod download
