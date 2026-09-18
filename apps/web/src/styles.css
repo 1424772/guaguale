@@ -1972,12 +1972,13 @@ html, body, #root { width: 100%; height: 100%; margin: 0; overflow: hidden; }
 .scratch-dialog-deep-sea-salvage .symbol,
 .scratch-dialog .result-ticket-deep-sea-salvage strong,
 .ticket-live-result.card-deep-sea-salvage .ticket-live-symbol {
-  margin: 3%;
+  margin: 0;
   overflow: hidden;
-  border: 2px solid rgba(223,189,94,.68);
-  border-radius: 50%;
+  border: 0;
+  border-radius: 0;
+  clip-path: ellipse(43% 43% at 50% 50%);
   background: radial-gradient(circle, rgba(13,87,101,.85), rgba(2,35,53,.92));
-  box-shadow: inset 0 0 8px rgba(0,0,0,.62), 0 0 5px rgba(123,238,222,.18);
+  box-shadow: none;
 }
 .scratch-dialog-deep-sea-salvage .ticket-symbol-glyph-artwork,
 .scratch-dialog .result-ticket-deep-sea-salvage .ticket-symbol-glyph-artwork,
@@ -2079,6 +2080,17 @@ html, body, #root { width: 100%; height: 100%; margin: 0; overflow: hidden; }
   mix-blend-mode: screen;
 }
 .scratch-dialog-all-in .scratch-layer { border-radius: 50%; }
+
+/* Match every rectangular prize layer to the four-pixel inset used by its
+   canvas coating so unopened artwork can never leak around the foil. */
+.scratch-dialog-street-store .symbol,
+.scratch-dialog-arcade-challenge .symbol,
+.scratch-dialog-gold-mine .symbol,
+.scratch-dialog-rocket-launch .symbol,
+.scratch-dialog-eternal-color-diamond .symbol {
+  margin: 0;
+  clip-path: inset(4px round 10px);
+}
 
 @media (max-width: 700px) {
   .scratch-dialog-all-in { --scratch-y: 4.7%; }

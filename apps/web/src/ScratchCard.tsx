@@ -57,7 +57,47 @@ const symbolVisuals: Record<string, { emoji: string; label: string }> = {
   '天使': { emoji: '🪽', label: '天使' },
 }
 
-const diamondAppraisals = ['重量', '切工', '净度', '火彩', '稀有度']
+type CoatingTheme = {
+  stops: Array<[number, string]>
+  edge: string
+  light: string
+  dark: string
+}
+
+const coatingThemes: Record<string, CoatingTheme> = {
+  'lingqian-ticket': {
+    stops: [[0, '#8b918b'], [.18, '#d0d0c5'], [.46, '#a5aaa3'], [.72, '#e0dbca'], [1, '#777f79']],
+    edge: 'rgba(55, 68, 61, .76)', light: 'rgba(255, 252, 229, .2)', dark: 'rgba(54, 62, 58, .2)',
+  },
+  'street-store': {
+    stops: [[0, '#aa8262'], [.2, '#e5cda2'], [.46, '#bf9873'], [.72, '#f0ddba'], [1, '#936b50']],
+    edge: 'rgba(101, 58, 39, .78)', light: 'rgba(255, 244, 204, .22)', dark: 'rgba(91, 56, 41, .2)',
+  },
+  'arcade-challenge': {
+    stops: [[0, '#4d557a'], [.2, '#96a7c2'], [.43, '#59658e'], [.7, '#b5b8cc'], [1, '#353c66']],
+    edge: 'rgba(73, 47, 118, .86)', light: 'rgba(149, 229, 255, .23)', dark: 'rgba(29, 32, 75, .28)',
+  },
+  'gold-mine': {
+    stops: [[0, '#695844'], [.2, '#b9a379'], [.45, '#78664c'], [.72, '#c8b183'], [1, '#4b4237']],
+    edge: 'rgba(89, 53, 23, .9)', light: 'rgba(255, 220, 136, .2)', dark: 'rgba(54, 43, 30, .3)',
+  },
+  'rocket-launch': {
+    stops: [[0, '#526477'], [.2, '#b7c8d1'], [.44, '#687d8d'], [.72, '#d4d9d8'], [1, '#405363']],
+    edge: 'rgba(33, 66, 92, .88)', light: 'rgba(194, 236, 255, .25)', dark: 'rgba(30, 52, 72, .24)',
+  },
+  'deep-sea-salvage': {
+    stops: [[0, '#718d8b'], [.2, '#c8d3c9'], [.45, '#879c98'], [.7, '#d9d6c2'], [1, '#526e70']],
+    edge: 'rgba(44, 103, 106, .94)', light: 'rgba(211, 255, 241, .23)', dark: 'rgba(29, 79, 80, .3)',
+  },
+  'eternal-color-diamond': {
+    stops: [[0, '#aaa4bd'], [.18, '#eeeafa'], [.4, '#b8cce2'], [.62, '#f8e5ef'], [.8, '#c7b6e4'], [1, '#8f91ae']],
+    edge: 'rgba(128, 113, 172, .88)', light: 'rgba(255, 255, 255, .32)', dark: 'rgba(104, 101, 144, .2)',
+  },
+  'all-in': {
+    stops: [[0, '#17191c'], [.23, '#4b4b50'], [.46, '#242429'], [.7, '#686368'], [1, '#151417']],
+    edge: 'rgba(126, 33, 38, .96)', light: 'rgba(225, 211, 202, .14)', dark: 'rgba(83, 8, 14, .34)',
+  },
+}
 
 export function getSymbolVisual(symbol: string) {
   const baseSymbol = symbol.replace(/^目标·/, '')
@@ -210,61 +250,51 @@ export function ScratchCard({ cardCode, cardName, symbols, scratchLevel, prizeTi
     setRevealedIndexes([])
     setProgress(0)
     context.scale(ratio, ratio)
-    const gradient = context.createLinearGradient(0, 0, width, height)
-    gradient.addColorStop(0, '#85898a')
-    gradient.addColorStop(0.22, '#c8c9c5')
-    gradient.addColorStop(0.48, '#9b9e9d')
-    gradient.addColorStop(0.72, '#dad7ce')
-    gradient.addColorStop(1, '#777b7d')
-    context.fillStyle = gradient
-    context.textAlign = 'center'
-    if (cardCode === 'eternal-color-diamond') {
-      const gap = 12
-      const margin = 18
-      const cellWidth = (width - margin * 2 - gap * 4) / 5
-      diamondAppraisals.forEach((_, index) => {
-        const x = margin + index * (cellWidth + gap)
-        context.beginPath()
-        context.roundRect(x, 18, cellWidth, height - 36, 13)
-        context.fill()
-        context.fillStyle = gradient
-      })
-    } else if (cardCode === 'all-in') {
-      context.beginPath()
-      context.arc(width / 2, height / 2, Math.min(width, height) / 2 - 18, 0, Math.PI * 2)
-      context.fill()
-    } else if (cardCode === 'street-store' || cardCode === 'arcade-challenge' || cardCode === 'gold-mine' || cardCode === 'rocket-launch') {
-      const coatingCells = getCellBounds(cardCode, symbols.length, columns, width, height)
-      coatingCells.forEach((cell) => {
-        context.beginPath()
-        context.roundRect(cell.x + 4, cell.y + 4, cell.width - 8, cell.height - 8, Math.min(16, cell.height * .1))
-        context.fill()
-      })
-    } else if (cardCode === 'deep-sea-salvage') {
-      const coatingCells = getCellBounds(cardCode, symbols.length, columns, width, height)
-      coatingCells.forEach((cell) => {
-        context.beginPath()
-        context.ellipse(cell.x + cell.width / 2, cell.y + cell.height / 2, cell.width * .43, cell.height * .43, 0, 0, Math.PI * 2)
-        context.fill()
-      })
-    } else {
-      context.fillRect(0, 0, width, height)
+    const theme = coatingThemes[cardCode] ?? coatingThemes['lingqian-ticket']
+    const coatingCells = getCellBounds(cardCode, symbols.length, columns, width, height)
+    const themedGradient = (cell: CellBounds) => {
+      const gradient = context.createLinearGradient(cell.x, cell.y, cell.x + cell.width, cell.y + cell.height)
+      theme.stops.forEach(([offset, color]) => gradient.addColorStop(offset, color))
+      return gradient
     }
+    const traceCoating = (cell: CellBounds) => {
+      context.beginPath()
+      if (cardCode === 'deep-sea-salvage') {
+        context.ellipse(cell.x + cell.width / 2, cell.y + cell.height / 2, cell.width * .43, cell.height * .43, 0, 0, Math.PI * 2)
+      } else if (cardCode === 'all-in') {
+        context.arc(cell.x + cell.width / 2, cell.y + cell.height / 2, Math.min(cell.width, cell.height) / 2, 0, Math.PI * 2)
+      } else {
+        const inset = cardCode === 'lingqian-ticket' ? 0 : 4
+        context.roundRect(cell.x + inset, cell.y + inset, cell.width - inset * 2, cell.height - inset * 2, cardCode === 'lingqian-ticket' ? 0 : Math.min(16, cell.height * .1))
+      }
+    }
+    const shapes = cardCode === 'lingqian-ticket'
+      ? [{ x: 0, y: 0, width, height }]
+      : coatingCells
+    shapes.forEach((cell) => {
+      traceCoating(cell)
+      context.fillStyle = themedGradient(cell)
+      context.fill()
+      context.strokeStyle = theme.edge
+      context.lineWidth = cardCode === 'deep-sea-salvage' || cardCode === 'all-in' ? 3 : 2
+      context.stroke()
+    })
+    context.textAlign = 'center'
     context.save()
     context.globalCompositeOperation = 'source-atop'
     context.lineWidth = 1
     for (let offset = -height; offset < width + height; offset += 19) {
-      context.strokeStyle = offset % 38 === 0 ? 'rgba(255,255,255,.18)' : 'rgba(42,46,47,.12)'
+      context.strokeStyle = offset % 38 === 0 ? theme.light : theme.dark
       context.beginPath()
       context.moveTo(offset, height)
       context.lineTo(offset + height, 0)
       context.stroke()
     }
-    for (let index = 0; index < 86; index++) {
+    for (let index = 0; index < 108; index++) {
       const x = (index * 83 + 17) % width
       const y = (index * 47 + 29) % height
       const radius = 1 + (index % 3) * .65
-      context.fillStyle = index % 2 ? 'rgba(245,242,230,.2)' : 'rgba(45,47,48,.18)'
+      context.fillStyle = index % 2 ? theme.light : theme.dark
       context.beginPath()
       context.arc(x, y, radius, 0, Math.PI * 2)
       context.fill()
@@ -273,6 +303,41 @@ export function ScratchCard({ cardCode, cardName, symbols, scratchLevel, prizeTi
       context.fillStyle = 'rgba(45,48,47,.16)'
       context.font = '800 40px Georgia, serif'
       for (let x = 78; x < width; x += 175) context.fillText('$', x, height / 2 + 14)
+    }
+    if (cardCode === 'deep-sea-salvage') {
+      coatingCells.forEach((cell, index) => {
+        context.strokeStyle = index % 2 ? 'rgba(195, 242, 224, .22)' : 'rgba(22, 104, 105, .34)'
+        context.lineWidth = 5
+        context.beginPath()
+        context.ellipse(cell.x + cell.width / 2, cell.y + cell.height / 2, cell.width * .38, cell.height * .38, -.35, .15, Math.PI * 1.2)
+        context.stroke()
+      })
+    }
+    if (cardCode === 'arcade-challenge' || cardCode === 'rocket-launch') {
+      context.lineWidth = 1
+      for (let y = 9; y < height; y += 11) {
+        context.strokeStyle = y % 22 ? theme.dark : theme.light
+        context.beginPath()
+        context.moveTo(0, y)
+        context.lineTo(width, y)
+        context.stroke()
+      }
+    }
+    if (cardCode === 'eternal-color-diamond') {
+      ;['rgba(255,169,218,.2)', 'rgba(135,219,255,.22)', 'rgba(255,244,164,.18)'].forEach((color, index) => {
+        context.fillStyle = color
+        context.fillRect(width * (.13 + index * .29), 0, 18, height)
+      })
+    }
+    if (cardCode === 'all-in') {
+      context.strokeStyle = 'rgba(151, 31, 38, .42)'
+      context.lineWidth = 3
+      for (let index = 0; index < 7; index++) {
+        context.beginPath()
+        context.moveTo(width * .32 + index * 37, height * .18)
+        context.lineTo(width * .45 + index * 19, height * .82)
+        context.stroke()
+      }
     }
     context.restore()
     const cells = getCellBounds(cardCode, symbols.length, columns, width, height)
