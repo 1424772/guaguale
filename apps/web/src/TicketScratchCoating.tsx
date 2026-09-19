@@ -12,7 +12,7 @@ const coatingCellCounts: Record<string, number> = {
 }
 
 export function usesFullCoatingPreview(cardCode: string) {
-  return cardCode === 'eternal-color-diamond'
+  return cardCode === 'eternal-color-diamond' || cardCode === 'street-store'
 }
 
 export function TicketScratchCoating({ cardCode, progress = 0 }: { cardCode: string; progress?: number }) {

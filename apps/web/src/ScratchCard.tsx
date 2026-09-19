@@ -164,17 +164,23 @@ export function symbolStateClassNames(cardCode: string, symbols: string[], index
 
 function getCellBounds(cardCode: string, count: number, columns: number, width: number, height: number): CellBounds[] {
   if (cardCode === 'street-store') {
-    const gap = width * .014
-    const cellWidth = width * .225
-    const cellHeight = height * .455
-    return Array.from({ length: count }, (_, index) => index < 6
-      ? {
-          x: width * .01 + (index % 3) * (cellWidth + gap),
-          y: height * .02 + Math.floor(index / 3) * (cellHeight + height * .04),
-          width: cellWidth,
-          height: cellHeight,
-        }
-      : { x: width * .735, y: height * .15, width: width * .255, height: height * .7 })
+    const scaleX = width / 720
+    const scaleY = height / 290
+    const authoredCells = [
+      { x: 0, y: 0, width: 139, height: 129 },
+      { x: 161, y: 0, width: 136, height: 130 },
+      { x: 321, y: 0, width: 132, height: 129 },
+      { x: 0, y: 150, width: 138, height: 126 },
+      { x: 162, y: 150, width: 136, height: 128 },
+      { x: 320, y: 150, width: 134, height: 131 },
+      { x: 479, y: 31, width: 236, height: 201 },
+    ]
+    return authoredCells.slice(0, count).map((cell) => ({
+      x: cell.x * scaleX,
+      y: cell.y * scaleY,
+      width: cell.width * scaleX,
+      height: cell.height * scaleY,
+    }))
   }
   if (cardCode === 'gold-mine') {
     return Array.from({ length: count }, (_, index) => index === 0
@@ -282,7 +288,7 @@ export function ScratchCard({ cardCode, cardName, symbols, scratchLevel, prizeTi
         context.lineTo(x, y + cutY)
         context.closePath()
       } else {
-        const inset = cardCode === 'lingqian-ticket' ? 0 : 4
+        const inset = cardCode === 'lingqian-ticket' || cardCode === 'street-store' ? 0 : 4
         context.roundRect(cell.x + inset, cell.y + inset, cell.width - inset * 2, cell.height - inset * 2, cardCode === 'lingqian-ticket' ? 0 : Math.min(16, cell.height * .1))
       }
     }
