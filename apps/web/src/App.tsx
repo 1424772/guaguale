@@ -8,7 +8,7 @@ import { getSymbolVisual, scratchLayoutFor, ScratchCard, symbolClassName, symbol
 import { ShopDialog } from './ShopDialog'
 import { RobotDialog } from './RobotDialog'
 import { TicketScratchCoating } from './TicketScratchCoating'
-import { ticketArtworkFor } from './ticketArtwork'
+import { ticketArtworkFor, unopenedTicketArtworkFor } from './ticketArtwork'
 
 const coinFormatter = new Intl.NumberFormat('zh-CN')
 
@@ -787,7 +787,7 @@ export function App() {
               <div className="tray-stack">
                 {trayTickets.slice(0, 8).map((ticket) => (
                   <button type="button" key={ticket.id} draggable onDragStart={() => setTrayDragging(true)} onDragEnd={(event) => dragTrayTicketToDesk(ticket, event)} onClick={() => { sendToDesk(ticket); setCatalogOpen(false) }} disabled={busy}>
-                    <span className={`tray-ticket-face card-${ticket.cardCode}`}><img src={ticketArtworkFor(ticket.cardCode)} alt="" /><TicketScratchCoating cardCode={ticket.cardCode} /></span><span>{ticket.cardName}</span><small>{ticket.source === 'daily_wheel' ? '免费刮刮乐' : `${ticket.nominalPrice} 金币`}</small><strong>拖出或点击放置</strong>
+                    <span className={`tray-ticket-face card-${ticket.cardCode}`}><img src={unopenedTicketArtworkFor(ticket.cardCode)} alt="" /></span><span>{ticket.cardName}</span><small>{ticket.source === 'daily_wheel' ? '免费刮刮乐' : `${ticket.nominalPrice} 金币`}</small><strong>拖出或点击放置</strong>
                   </button>
                 ))}
                 {trayTickets.length > 8 && <small>还有 {trayTickets.length - 8} 张等待放置</small>}
@@ -796,7 +796,7 @@ export function App() {
           </div>
           {firstCard && (
             <article className="featured-card">
-              <span className={`featured-ticket-face card-${firstCard.code}`}><img src={ticketArtworkFor(firstCard.code)} alt="零钱小票刮刮乐票面" /><TicketScratchCoating cardCode={firstCard.code} /></span>
+              <span className={`featured-ticket-face card-${firstCard.code}`}><img src={unopenedTicketArtworkFor(firstCard.code)} alt="零钱小票未刮票面" /></span>
               <div className="featured-copy">
                 <div><span className="tag">已开放</span><h2>{firstCard.name}</h2></div>
                 <p>三格中出现两格相同即可获得对应奖励，三格相同奖励翻倍。</p>
@@ -816,7 +816,7 @@ export function App() {
             {cards.filter((card) => card.code !== 'lingqian-ticket').map((card, index) => (
               <button className="tier-row" key={card.code} type="button" disabled={!card.implemented || !card.unlocked || busy} onClick={() => purchase(card)}>
                 <span className="tier-number">{index + 2}</span>
-                <span className={`tier-ticket-face card-${card.code}`}><img src={ticketArtworkFor(card.code)} alt="" /><TicketScratchCoating cardCode={card.code} /></span>
+                <span className={`tier-ticket-face card-${card.code}`}><img src={unopenedTicketArtworkFor(card.code)} alt="" /></span>
                 <div><strong>{card.name}</strong><small>{coinFormatter.format(card.price)} 金币门槛</small></div>
                 <span className={card.unlocked ? 'unlocked' : 'locked'}>{!card.implemented ? '待开发' : card.unlocked ? '购买' : '未解锁'}</span>
               </button>
@@ -874,8 +874,8 @@ export function App() {
                         style={{ '--scratch-progress': `${visualProgress}%` } as CSSProperties}
                       >
                         <button type="button" onClick={() => openTicket(slotTicket)}>
-                          <img src={ticketArtworkFor(slotTicket.cardCode)} alt={`${slotTicket.cardName}票面`} />
-                          {slotTicket.state === 'purchased' && <TicketScratchCoating cardCode={slotTicket.cardCode} progress={visualProgress} />}
+                          <img src={slotTicket.state === 'purchased' && visualProgress <= 0 ? unopenedTicketArtworkFor(slotTicket.cardCode) : ticketArtworkFor(slotTicket.cardCode)} alt={`${slotTicket.cardName}票面`} />
+                          {slotTicket.state === 'purchased' && visualProgress > 0 && <TicketScratchCoating cardCode={slotTicket.cardCode} progress={visualProgress} />}
                           <TicketResultSurface ticket={slotTicket} compact />
                           <strong>{slotTicket.cardName}</strong>
                           <small>{!visuallyComplete
@@ -906,8 +906,7 @@ export function App() {
                 } as CSSProperties}
                 aria-hidden="true"
               >
-                <img src={ticketArtworkFor(robotIntakeTicket.cardCode)} alt="" />
-                <TicketScratchCoating cardCode={robotIntakeTicket.cardCode} progress={scratchProgress[robotIntakeTicket.id] ?? 0} />
+                <img src={unopenedTicketArtworkFor(robotIntakeTicket.cardCode)} alt="" />
               </div>
             )}
             <button

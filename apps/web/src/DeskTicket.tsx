@@ -2,7 +2,7 @@ import { PointerEvent, RefObject, useEffect, useState } from 'react'
 import type { Ticket } from './api'
 import { getSymbolVisual, symbolClassName, symbolStateClassNames, TicketSymbolGlyph } from './ScratchCard'
 import { TicketScratchCoating } from './TicketScratchCoating'
-import { ticketArtworkFor } from './ticketArtwork'
+import { ticketArtworkFor, unopenedTicketArtworkFor } from './ticketArtwork'
 
 export type DeskPlacement = {
   deskX: number
@@ -120,8 +120,8 @@ export function DeskTicket({ ticket, deskRef, topZ, onOpen, onPin, onRobot, fanA
       onPointerUp={pointerEnd}
       onPointerCancel={() => setDrag(null)}
     >
-      <img className="ticket-artwork" src={ticketArtworkFor(ticket.cardCode)} alt="" draggable={false} />
-      {ticket.state === 'purchased' && <TicketScratchCoating cardCode={ticket.cardCode} progress={scratchProgress} />}
+      <img className="ticket-artwork" src={ticket.state === 'purchased' && scratchProgress <= 0 ? unopenedTicketArtworkFor(ticket.cardCode) : ticketArtworkFor(ticket.cardCode)} alt="" draggable={false} />
+      {ticket.state === 'purchased' && scratchProgress > 0 && <TicketScratchCoating cardCode={ticket.cardCode} progress={scratchProgress} />}
       <TicketResultSurface ticket={ticket} />
       <span className="movable-ticket-name">{ticket.cardName}</span>
       <div className="movable-ticket-scratch">
