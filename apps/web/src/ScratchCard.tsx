@@ -173,7 +173,7 @@ function getCellBounds(cardCode: string, count: number, columns: number, width: 
       { x: 0, y: 139, width: 140, height: 141 },
       { x: 160, y: 139, width: 138, height: 141 },
       { x: 320, y: 139, width: 136, height: 141 },
-      { x: 472, y: 30, width: 243, height: 210 },
+      { x: 479, y: 60, width: 236, height: 180 },
     ]
     return authoredCells.slice(0, count).map((cell) => ({
       x: cell.x * scaleX,
