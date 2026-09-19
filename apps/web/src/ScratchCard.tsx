@@ -71,8 +71,8 @@ const coatingThemes: Record<string, CoatingTheme> = {
     edge: 'rgba(55, 68, 61, .76)', light: 'rgba(255, 252, 229, .2)', dark: 'rgba(54, 62, 58, .2)',
   },
   'street-store': {
-    stops: [[0, '#aa8262'], [.2, '#e5cda2'], [.46, '#bf9873'], [.72, '#f0ddba'], [1, '#936b50']],
-    edge: 'rgba(101, 58, 39, .78)', light: 'rgba(255, 244, 204, .22)', dark: 'rgba(91, 56, 41, .2)',
+    stops: [[0, '#858681'], [.2, '#bcb9ae'], [.46, '#94958f'], [.72, '#c9c5b9'], [1, '#797a76']],
+    edge: 'rgba(72, 69, 61, .72)', light: 'rgba(255, 250, 232, .22)', dark: 'rgba(66, 64, 59, .2)',
   },
   'arcade-challenge': {
     stops: [[0, '#4d557a'], [.2, '#96a7c2'], [.43, '#59658e'], [.7, '#b5b8cc'], [1, '#353c66']],
@@ -167,13 +167,13 @@ function getCellBounds(cardCode: string, count: number, columns: number, width: 
     const scaleX = width / 720
     const scaleY = height / 290
     const authoredCells = [
-      { x: 0, y: 0, width: 139, height: 129 },
-      { x: 161, y: 0, width: 136, height: 130 },
-      { x: 321, y: 0, width: 132, height: 129 },
-      { x: 0, y: 150, width: 138, height: 126 },
-      { x: 162, y: 150, width: 136, height: 128 },
-      { x: 320, y: 150, width: 134, height: 131 },
-      { x: 479, y: 31, width: 236, height: 201 },
+      { x: 0, y: 0, width: 140, height: 130 },
+      { x: 160, y: 0, width: 138, height: 130 },
+      { x: 320, y: 0, width: 136, height: 130 },
+      { x: 0, y: 139, width: 140, height: 141 },
+      { x: 160, y: 139, width: 138, height: 141 },
+      { x: 320, y: 139, width: 136, height: 141 },
+      { x: 472, y: 30, width: 243, height: 210 },
     ]
     return authoredCells.slice(0, count).map((cell) => ({
       x: cell.x * scaleX,
@@ -393,7 +393,11 @@ export function ScratchCard({ cardCode, cardName, symbols, scratchLevel, prizeTi
         context.save()
         traceCoating(cell, index)
         context.clip()
-        context.drawImage(coatingArtwork, 0, 0, width, height)
+        if (cardCode === 'street-store') {
+          context.drawImage(coatingArtwork, 12, 12, 108, 104, cell.x, cell.y, cell.width, cell.height)
+        } else {
+          context.drawImage(coatingArtwork, 0, 0, width, height)
+        }
         context.restore()
       })
       rememberOpaquePixels()
