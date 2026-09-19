@@ -4,7 +4,7 @@ import arcade from './assets/scratch-coatings/arcade-challenge-coating-v1.webp'
 import goldMine from './assets/scratch-coatings/gold-mine-coating-v1.webp'
 import rocket from './assets/scratch-coatings/rocket-launch-coating-v1.webp'
 import deepSea from './assets/scratch-coatings/deep-sea-salvage-coating-v1.webp'
-import diamond from './assets/scratch-coatings/eternal-color-diamond-coating-v1.webp'
+import diamond from './assets/scratch-coatings/eternal-color-diamond-foil-v2.webp'
 import allIn from './assets/scratch-coatings/all-in-coating-v1.webp'
 
 const artworkByCardCode: Record<string, string> = {

@@ -187,10 +187,10 @@ function getCellBounds(cardCode: string, count: number, columns: number, width: 
         })
   }
   if (cardCode === 'eternal-color-diamond') {
-    const gap = 12
-    const margin = 18
+    const gap = 31
+    const margin = 2
     const cellWidth = (width - margin * 2 - gap * 4) / 5
-    return Array.from({ length: count }, (_, index) => ({ x: margin + index * (cellWidth + gap), y: 18, width: cellWidth, height: height - 36 }))
+    return Array.from({ length: count }, (_, index) => ({ x: margin + index * (cellWidth + gap), y: 5, width: cellWidth, height: height - 10 }))
   }
   if (cardCode === 'all-in') return [{ x: 18, y: 18, width: width - 36, height: height - 36 }]
   const rows = Math.ceil(count / columns)

@@ -1593,7 +1593,7 @@ html, body, #root { width: 100%; height: 100%; margin: 0; overflow: hidden; }
 .scratch-dialog-gold-mine { --scratch-x: 10.1%; --scratch-y: 29.7%; --scratch-w: 80.2%; --scratch-h: 43.3%; }
 .scratch-dialog-rocket-launch { --scratch-x: 5.2%; --scratch-y: 40%; --scratch-w: 72.2%; --scratch-h: 33%; }
 .scratch-dialog-deep-sea-salvage { --scratch-x: 17.6%; --scratch-y: 21.2%; --scratch-w: 66.6%; --scratch-h: 51.4%; }
-.scratch-dialog-eternal-color-diamond { --scratch-x: 5.4%; --scratch-y: 49.4%; --scratch-w: 89.4%; --scratch-h: 21.8%; }
+.scratch-dialog-eternal-color-diamond { --scratch-x: 5.4%; --scratch-y: 52.3%; --scratch-w: 89.4%; --scratch-h: 18%; }
 .scratch-dialog-all-in { --scratch-x: 31.7%; --scratch-y: 8.2%; --scratch-w: 37.5%; --scratch-h: 64%; }
 .scratch-zoom-artwork {
   position: absolute;
@@ -1775,7 +1775,7 @@ html, body, #root { width: 100%; height: 100%; margin: 0; overflow: hidden; }
 .movable-ticket.card-gold-mine, .slot-ticket.card-gold-mine { --ticket-result-x: 10.1%; --ticket-result-y: 29.7%; --ticket-result-w: 80.2%; --ticket-result-h: 43.3%; }
 .movable-ticket.card-rocket-launch, .slot-ticket.card-rocket-launch { --ticket-result-x: 5.2%; --ticket-result-y: 40%; --ticket-result-w: 72.2%; --ticket-result-h: 33%; }
 .movable-ticket.card-deep-sea-salvage, .slot-ticket.card-deep-sea-salvage { --ticket-result-x: 17.6%; --ticket-result-y: 21.2%; --ticket-result-w: 66.6%; --ticket-result-h: 51.4%; }
-.movable-ticket.card-eternal-color-diamond, .slot-ticket.card-eternal-color-diamond { --ticket-result-x: 5.4%; --ticket-result-y: 49.4%; --ticket-result-w: 89.4%; --ticket-result-h: 21.8%; }
+.movable-ticket.card-eternal-color-diamond, .slot-ticket.card-eternal-color-diamond { --ticket-result-x: 5.4%; --ticket-result-y: 52.3%; --ticket-result-w: 89.4%; --ticket-result-h: 18%; }
 .movable-ticket.card-all-in, .slot-ticket.card-all-in { --ticket-result-x: 31.7%; --ticket-result-y: 8.2%; --ticket-result-w: 37.5%; --ticket-result-h: 64%; }
 
 .ticket-live-result {
@@ -2013,22 +2013,22 @@ html, body, #root { width: 100%; height: 100%; margin: 0; overflow: hidden; }
   object-position: left center;
 }
 
-/* 永恒彩钻：深色鉴定台承托彩色钻石，禁止通用灰层洗白。 */
+/* 永恒彩钻：原生银饰框属于票面，交互层只占用五个内嵌鉴定腔。 */
 .scratch-dialog-eternal-color-diamond .scratch-stage,
 .scratch-dialog .result-ticket-eternal-color-diamond,
 .ticket-live-result.card-eternal-color-diamond {
-  border: 2px solid rgba(237,225,255,.88);
-  background: linear-gradient(150deg, #55566f, #282b43 48%, #181a2d);
-  box-shadow: inset 0 0 18px rgba(0,0,0,.56), 0 0 9px rgba(202,182,255,.3);
+  border: 0;
+  background: transparent;
+  box-shadow: none;
 }
 .scratch-dialog-eternal-color-diamond .symbol,
 .scratch-dialog .result-ticket-eternal-color-diamond strong,
 .ticket-live-result.card-eternal-color-diamond .ticket-live-symbol {
-  margin: 1%;
-  border: 1px solid rgba(237,225,255,.4);
-  border-radius: 8px;
-  background: linear-gradient(145deg, rgba(91,91,119,.76), rgba(27,29,48,.9));
-  box-shadow: inset 0 0 8px rgba(255,255,255,.08);
+  margin: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  box-shadow: none;
 }
 .scratch-dialog-eternal-color-diamond .ticket-symbol-glyph-artwork,
 .scratch-dialog .result-ticket-eternal-color-diamond .ticket-symbol-glyph-artwork,
@@ -2094,6 +2094,7 @@ html, body, #root { width: 100%; height: 100%; margin: 0; overflow: hidden; }
 .scratch-dialog-gold-mine .symbol {
   clip-path: polygon(16% 4px, 84% 4px, calc(100% - 4px) 16%, calc(100% - 4px) 84%, 84% calc(100% - 4px), 16% calc(100% - 4px), 4px 84%, 4px 16%);
 }
+.scratch-dialog-eternal-color-diamond .symbol { clip-path: inset(2px round 4px); }
 
 @media (max-width: 700px) {
   .scratch-dialog-all-in { --scratch-y: 4.7%; }
@@ -2130,7 +2131,7 @@ html, body, #root { width: 100%; height: 100%; margin: 0; overflow: hidden; }
 .ticket-scratch-coating.card-gold-mine { --ticket-result-x: 10.1%; --ticket-result-y: 29.7%; --ticket-result-w: 80.2%; --ticket-result-h: 43.3%; grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(2, 1fr); }
 .ticket-scratch-coating.card-rocket-launch { --ticket-result-x: 5.2%; --ticket-result-y: 40%; --ticket-result-w: 72.2%; --ticket-result-h: 33%; grid-template-columns: repeat(4, 1fr); }
 .ticket-scratch-coating.card-deep-sea-salvage { --ticket-result-x: 17.6%; --ticket-result-y: 21.2%; --ticket-result-w: 66.6%; --ticket-result-h: 51.4%; grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(2, 1fr); }
-.ticket-scratch-coating.card-eternal-color-diamond { --ticket-result-x: 5.4%; --ticket-result-y: 49.4%; --ticket-result-w: 89.4%; --ticket-result-h: 21.8%; grid-template-columns: repeat(5, 1fr); }
+.ticket-scratch-coating.card-eternal-color-diamond { --ticket-result-x: 5.4%; --ticket-result-y: 52.3%; --ticket-result-w: 89.4%; --ticket-result-h: 18%; grid-template-columns: repeat(5, minmax(0, 1fr)); column-gap: 4.3%; }
 .ticket-scratch-coating.card-all-in { --ticket-result-x: 31.25%; --ticket-result-y: 4.7%; --ticket-result-w: 37.5%; --ticket-result-h: 66.7%; grid-template-columns: 1fr; border-radius: 50%; }
 .ticket-scratch-coating > i {
   position: relative;
