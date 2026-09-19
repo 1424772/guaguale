@@ -15,9 +15,12 @@ export function usesFullCoatingPreview(cardCode: string) {
   return cardCode === 'eternal-color-diamond' || cardCode === 'street-store'
 }
 
-export function TicketScratchCoating({ cardCode, progress = 0 }: { cardCode: string; progress?: number }) {
+export function TicketScratchCoating({ cardCode, progress = 0, snapshot }: { cardCode: string; progress?: number; snapshot?: string }) {
   const count = coatingCellCounts[cardCode] ?? 1
   const safeProgress = Math.max(0, Math.min(100, progress))
+  if (snapshot) {
+    return <img className={`ticket-scratch-coating ticket-scratch-snapshot card-${cardCode}`} src={snapshot} alt="" draggable={false} aria-hidden="true" />
+  }
   return (
     <span
       className={`ticket-scratch-coating card-${cardCode}`}

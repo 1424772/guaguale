@@ -21,6 +21,7 @@ type DeskTicketProps = {
   fanAction?: 'discarded' | 'robot' | 'caught' | 'safe'
   motion?: 'robot-ejected' | 'redeeming' | 'discarding'
   scratchProgress?: number
+  scratchSnapshot?: string
   onDrop: (ticket: Ticket, point: { x: number; y: number }, placement: DeskPlacement) => void
 }
 
@@ -43,7 +44,7 @@ export function TicketResultSurface({ ticket, compact = false }: { ticket: Ticke
   )
 }
 
-export function DeskTicket({ ticket, deskRef, topZ, onOpen, onPin, onRobot, fanAction, motion, scratchProgress = 0, onDrop }: DeskTicketProps) {
+export function DeskTicket({ ticket, deskRef, topZ, onOpen, onPin, onRobot, fanAction, motion, scratchProgress = 0, scratchSnapshot, onDrop }: DeskTicketProps) {
   const fullCoatingPreview = ticket.state === 'purchased' && usesFullCoatingPreview(ticket.cardCode)
   const [placement, setPlacement] = useState<DeskPlacement>({
     deskX: ticket.deskX,
@@ -122,7 +123,7 @@ export function DeskTicket({ ticket, deskRef, topZ, onOpen, onPin, onRobot, fanA
       onPointerCancel={() => setDrag(null)}
     >
       <img className="ticket-artwork" src={fullCoatingPreview ? ticketArtworkFor(ticket.cardCode) : ticket.state === 'purchased' && scratchProgress <= 0 ? unopenedTicketArtworkFor(ticket.cardCode) : ticketArtworkFor(ticket.cardCode)} alt="" draggable={false} />
-      {ticket.state === 'purchased' && (fullCoatingPreview || scratchProgress > 0) && <TicketScratchCoating cardCode={ticket.cardCode} progress={fullCoatingPreview ? 0 : scratchProgress} />}
+      {ticket.state === 'purchased' && (fullCoatingPreview || scratchProgress > 0) && <TicketScratchCoating cardCode={ticket.cardCode} progress={fullCoatingPreview ? 0 : scratchProgress} snapshot={scratchSnapshot} />}
       <TicketResultSurface ticket={ticket} />
       <span className="movable-ticket-name">{ticket.cardName}</span>
       <div className="movable-ticket-scratch">

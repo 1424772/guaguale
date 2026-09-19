@@ -2145,6 +2145,13 @@ html, body, #root { width: 100%; height: 100%; margin: 0; overflow: hidden; }
 .ticket-scratch-coating.card-deep-sea-salvage { --ticket-result-x: 17.6%; --ticket-result-y: 21.2%; --ticket-result-w: 66.6%; --ticket-result-h: 51.4%; grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(2, 1fr); }
 .ticket-scratch-coating.card-eternal-color-diamond { --ticket-result-x: 5.4%; --ticket-result-y: 52.3%; --ticket-result-w: 89.4%; --ticket-result-h: 18%; grid-template-columns: repeat(5, minmax(0, 1fr)); column-gap: 4.3%; }
 .ticket-scratch-coating.card-all-in { --ticket-result-x: 31.25%; --ticket-result-y: 4.7%; --ticket-result-w: 37.5%; --ticket-result-h: 66.7%; grid-template-columns: 1fr; border-radius: 50%; }
+.ticket-scratch-coating.ticket-scratch-snapshot {
+  display: block;
+  clip-path: none;
+  object-fit: fill;
+  border: 0;
+  background: none !important;
+}
 .ticket-scratch-coating > i {
   position: relative;
   display: block;

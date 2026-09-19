@@ -31,6 +31,14 @@ function savedScratchProgress() {
   }
 }
 
+function savedScratchSnapshots() {
+  try {
+    return JSON.parse(window.localStorage.getItem('guaguale:scratch-snapshots') ?? '{}') as Record<string, string>
+  } catch {
+    return {}
+  }
+}
+
 export function App() {
   const [user, setUser] = useState<User | null>(null)
   const [cards, setCards] = useState<Card[]>([])
@@ -73,6 +81,7 @@ export function App() {
   const [robotOutputTicket, setRobotOutputTicket] = useState<Ticket | null>(null)
   const [coinBurst, setCoinBurst] = useState<{ key: number; reward: number } | null>(null)
   const [scratchProgress, setScratchProgress] = useState<Record<string, number>>(savedScratchProgress)
+  const [scratchSnapshots, setScratchSnapshots] = useState<Record<string, string>>(savedScratchSnapshots)
   const [trayDragging, setTrayDragging] = useState(false)
   const discardTimerRef = useRef<number | null>(null)
   const discardAnimationTimerRef = useRef<number | null>(null)
@@ -430,6 +439,18 @@ export function App() {
         window.localStorage.setItem('guaguale:scratch-progress', JSON.stringify(next))
       } catch {
         // The live UI remains accurate even when storage is unavailable.
+      }
+      return next
+    })
+  }
+
+  function rememberScratchSnapshot(ticketId: string, snapshot: string) {
+    setScratchSnapshots((current) => {
+      const next = { ...current, [ticketId]: snapshot }
+      try {
+        window.localStorage.setItem('guaguale:scratch-snapshots', JSON.stringify(next))
+      } catch {
+        // Keep the current page accurate if persistence is unavailable.
       }
       return next
     })
@@ -876,7 +897,7 @@ export function App() {
                       >
                         <button type="button" onClick={() => openTicket(slotTicket)}>
                           <img src={fullCoatingPreview ? ticketArtworkFor(slotTicket.cardCode) : slotTicket.state === 'purchased' && visualProgress <= 0 ? unopenedTicketArtworkFor(slotTicket.cardCode) : ticketArtworkFor(slotTicket.cardCode)} alt={`${slotTicket.cardName}票面`} />
-                          {slotTicket.state === 'purchased' && (fullCoatingPreview || visualProgress > 0) && <TicketScratchCoating cardCode={slotTicket.cardCode} progress={fullCoatingPreview ? 0 : visualProgress} />}
+                          {slotTicket.state === 'purchased' && (fullCoatingPreview || visualProgress > 0) && <TicketScratchCoating cardCode={slotTicket.cardCode} progress={fullCoatingPreview ? 0 : visualProgress} snapshot={scratchSnapshots[slotTicket.id]} />}
                           <TicketResultSurface ticket={slotTicket} compact />
                           <strong>{slotTicket.cardName}</strong>
                           <small>{!visuallyComplete
@@ -942,6 +963,7 @@ export function App() {
                 fanAction={fanActions[ticket.id]}
                 motion={ticket.id === robotEjectedTicketId ? 'robot-ejected' : ticket.id === redeemingTicketId ? 'redeeming' : ticket.id === discardingTicketId ? 'discarding' : undefined}
                 scratchProgress={scratchProgress[ticket.id] ?? 0}
+                scratchSnapshot={scratchSnapshots[ticket.id]}
                 onDrop={handleTicketDrop}
               />
             ))}
@@ -965,7 +987,7 @@ export function App() {
             <img className="scratch-zoom-artwork" src={ticketArtworkFor(activeTicket.cardCode)} alt={`${activeTicket.cardName}刮刮乐票面`} />
             <div className="scratch-zoom-layer">
             {scratchRequired ? (
-              <ScratchCard cardCode={activeTicket.cardCode} cardName={activeTicket.cardName} symbols={activeTicket.symbols ?? []} scratchLevel={user.scratchLevel} prizeTier={activeTicket.prizeTier} onProgress={(progress) => rememberScratchProgress(activeTicket.id, progress)} onComplete={() => void completeScratch(activeTicket.id)} />
+              <ScratchCard cardCode={activeTicket.cardCode} cardName={activeTicket.cardName} symbols={activeTicket.symbols ?? []} scratchLevel={user.scratchLevel} prizeTier={activeTicket.prizeTier} initialSnapshot={scratchSnapshots[activeTicket.id]} onSnapshot={(snapshot) => rememberScratchSnapshot(activeTicket.id, snapshot)} onProgress={(progress) => rememberScratchProgress(activeTicket.id, progress)} onComplete={() => void completeScratch(activeTicket.id)} />
             ) : (
               <ResultSymbols cardCode={activeTicket.cardCode} cardName={activeTicket.cardName} symbols={activeTicket.symbols ?? []} prizeTier={activeTicket.prizeTier} />
             )}

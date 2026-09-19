@@ -8,6 +8,8 @@ type ScratchCardProps = {
   symbols: string[]
   scratchLevel: number
   prizeTier?: string
+  initialSnapshot?: string
+  onSnapshot?: (snapshot: string) => void
   onComplete: () => void
   onProgress?: (progress: number) => void
 }
@@ -221,7 +223,7 @@ export function scratchLayoutFor(cardCode: string, symbolCount: number) {
   }
 }
 
-export function ScratchCard({ cardCode, cardName, symbols, scratchLevel, prizeTier = 'none', onComplete, onProgress }: ScratchCardProps) {
+export function ScratchCard({ cardCode, cardName, symbols, scratchLevel, prizeTier = 'none', initialSnapshot, onSnapshot, onComplete, onProgress }: ScratchCardProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const debrisLayerRef = useRef<HTMLDivElement>(null)
   const scratchToolRef = useRef<HTMLDivElement>(null)
@@ -403,9 +405,34 @@ export function ScratchCard({ cardCode, cardName, symbols, scratchLevel, prizeTi
       rememberOpaquePixels()
       context.globalCompositeOperation = 'destination-out'
     }
-    coatingArtwork.src = scratchCoatingArtworkFor(cardCode)
+    if (initialSnapshot) {
+      const snapshotArtwork = new Image()
+      snapshotArtwork.decoding = 'async'
+      snapshotArtwork.onload = () => {
+        if (cancelled || moveCountRef.current > 0 || completedRef.current) return
+        context.globalCompositeOperation = 'source-over'
+        context.clearRect(0, 0, width, height)
+        context.drawImage(snapshotArtwork, 0, 0, width, height)
+        context.globalCompositeOperation = 'destination-out'
+        measureProgress(context, canvas)
+      }
+      snapshotArtwork.onerror = () => {
+        if (!cancelled) coatingArtwork.src = scratchCoatingArtworkFor(cardCode)
+      }
+      snapshotArtwork.src = initialSnapshot
+    } else {
+      coatingArtwork.src = scratchCoatingArtworkFor(cardCode)
+    }
     return () => { cancelled = true }
   }, [cardCode, columns, stageHeight, symbols.length])
+
+  function saveSnapshot(canvas: HTMLCanvasElement) {
+    try {
+      onSnapshot?.(canvas.toDataURL('image/webp', .72))
+    } catch {
+      // Progress remains usable if this browser cannot serialize the canvas.
+    }
+  }
 
   function scratch(event: React.PointerEvent<HTMLCanvasElement>) {
     if (!drawingRef.current || completedRef.current) return
@@ -567,8 +594,14 @@ export function ScratchCard({ cardCode, cardName, symbols, scratchLevel, prizeTi
             lastPointRef.current = null
             const context = event.currentTarget.getContext('2d', { willReadFrequently: true })
             if (context && !completedRef.current) measureProgress(context, event.currentTarget)
+            if (!completedRef.current) saveSnapshot(event.currentTarget)
           }}
-          onPointerCancel={() => { drawingRef.current = false; lastPointRef.current = null; setIsScratching(false) }}
+          onPointerCancel={(event) => {
+            drawingRef.current = false
+            lastPointRef.current = null
+            setIsScratching(false)
+            if (!completedRef.current) saveSnapshot(event.currentTarget)
+          }}
           aria-label="刮奖区域"
         />
       </div>
