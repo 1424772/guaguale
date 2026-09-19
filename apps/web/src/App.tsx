@@ -961,7 +961,7 @@ export function App() {
         }}>
           <section className={`scratch-dialog scratch-dialog-${activeTicket.cardCode}`} role="dialog" aria-modal="true" aria-label="刮奖">
             <button className="close-button" type="button" onClick={() => setActiveTicket(null)} aria-label="关闭">×</button>
-            <img className="scratch-zoom-artwork" src={scratchRequired ? unopenedTicketArtworkFor(activeTicket.cardCode) : ticketArtworkFor(activeTicket.cardCode)} alt={`${activeTicket.cardName}刮刮乐票面`} />
+            <img className="scratch-zoom-artwork" src={ticketArtworkFor(activeTicket.cardCode)} alt={`${activeTicket.cardName}刮刮乐票面`} />
             <div className="scratch-zoom-layer">
             {scratchRequired ? (
               <ScratchCard cardCode={activeTicket.cardCode} cardName={activeTicket.cardName} symbols={activeTicket.symbols ?? []} scratchLevel={user.scratchLevel} prizeTier={activeTicket.prizeTier} onProgress={(progress) => rememberScratchProgress(activeTicket.id, progress)} onComplete={() => void completeScratch(activeTicket.id)} />
