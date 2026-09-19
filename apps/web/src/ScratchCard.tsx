@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { scratchCoatingArtworkFor } from './scratchCoatingArtwork'
 import { symbolArtworkFor } from './symbolArtwork'
 
 type ScratchCardProps = {
@@ -177,7 +178,7 @@ function getCellBounds(cardCode: string, count: number, columns: number, width: 
   }
   if (cardCode === 'gold-mine') {
     return Array.from({ length: count }, (_, index) => index === 0
-      ? { x: width * .01, y: height * .08, width: width * .32, height: height * .84 }
+      ? { x: 0, y: 0, width: width * .31, height }
       : {
           x: width * .48 + ((index - 1) % 3) * width * .175,
           y: height * .05 + Math.floor((index - 1) / 3) * height * .49,
@@ -257,22 +258,39 @@ export function ScratchCard({ cardCode, cardName, symbols, scratchLevel, prizeTi
       theme.stops.forEach(([offset, color]) => gradient.addColorStop(offset, color))
       return gradient
     }
-    const traceCoating = (cell: CellBounds) => {
+    const traceCoating = (cell: CellBounds, index = 0) => {
       context.beginPath()
       if (cardCode === 'deep-sea-salvage') {
         context.ellipse(cell.x + cell.width / 2, cell.y + cell.height / 2, cell.width * .43, cell.height * .43, 0, 0, Math.PI * 2)
       } else if (cardCode === 'all-in') {
         context.arc(cell.x + cell.width / 2, cell.y + cell.height / 2, Math.min(cell.width, cell.height) / 2, 0, Math.PI * 2)
+      } else if (cardCode === 'gold-mine') {
+        const inset = index === 0 ? 5 : 4
+        const x = cell.x + inset
+        const y = cell.y + inset
+        const cellWidth = cell.width - inset * 2
+        const cellHeight = cell.height - inset * 2
+        const cutX = cellWidth * .16
+        const cutY = cellHeight * .16
+        context.moveTo(x + cutX, y)
+        context.lineTo(x + cellWidth - cutX, y)
+        context.lineTo(x + cellWidth, y + cutY)
+        context.lineTo(x + cellWidth, y + cellHeight - cutY)
+        context.lineTo(x + cellWidth - cutX, y + cellHeight)
+        context.lineTo(x + cutX, y + cellHeight)
+        context.lineTo(x, y + cellHeight - cutY)
+        context.lineTo(x, y + cutY)
+        context.closePath()
       } else {
         const inset = cardCode === 'lingqian-ticket' ? 0 : 4
         context.roundRect(cell.x + inset, cell.y + inset, cell.width - inset * 2, cell.height - inset * 2, cardCode === 'lingqian-ticket' ? 0 : Math.min(16, cell.height * .1))
       }
     }
-    const shapes = cardCode === 'lingqian-ticket'
+    const shapes = (cardCode === 'lingqian-ticket'
       ? [{ x: 0, y: 0, width, height }]
-      : coatingCells
-    shapes.forEach((cell) => {
-      traceCoating(cell)
+      : coatingCells).map((cell, index) => ({ cell, index }))
+    shapes.forEach(({ cell, index }) => {
+      traceCoating(cell, index)
       context.fillStyle = themedGradient(cell)
       context.fill()
       context.strokeStyle = theme.edge
@@ -341,20 +359,42 @@ export function ScratchCard({ cardCode, cardName, symbols, scratchLevel, prizeTi
     }
     context.restore()
     const cells = getCellBounds(cardCode, symbols.length, columns, width, height)
-    const initialPixels = context.getImageData(0, 0, canvas.width, canvas.height).data
-    opaqueIndexesRef.current = cells.map((cell) => {
-      const indexes: number[] = []
-      for (let y = cell.y + 5; y < cell.y + cell.height - 4; y += 10) {
-        for (let x = cell.x + 5; x < cell.x + cell.width - 4; x += 10) {
-          const pixelX = Math.min(canvas.width - 1, Math.floor(x * ratio))
-          const pixelY = Math.min(canvas.height - 1, Math.floor(y * ratio))
-          const pixelIndex = (pixelY * canvas.width + pixelX) * 4 + 3
-          if (initialPixels[pixelIndex] >= 64) indexes.push(pixelIndex)
+    const rememberOpaquePixels = () => {
+      const initialPixels = context.getImageData(0, 0, canvas.width, canvas.height).data
+      opaqueIndexesRef.current = cells.map((cell) => {
+        const indexes: number[] = []
+        for (let y = cell.y + 5; y < cell.y + cell.height - 4; y += 10) {
+          for (let x = cell.x + 5; x < cell.x + cell.width - 4; x += 10) {
+            const pixelX = Math.min(canvas.width - 1, Math.floor(x * ratio))
+            const pixelY = Math.min(canvas.height - 1, Math.floor(y * ratio))
+            const pixelIndex = (pixelY * canvas.width + pixelX) * 4 + 3
+            if (initialPixels[pixelIndex] >= 64) indexes.push(pixelIndex)
+          }
         }
-      }
-      return indexes
-    })
+        return indexes
+      })
+    }
+    rememberOpaquePixels()
     context.globalCompositeOperation = 'destination-out'
+    let cancelled = false
+    const coatingArtwork = new Image()
+    coatingArtwork.decoding = 'async'
+    coatingArtwork.onload = () => {
+      if (cancelled || moveCountRef.current > 0 || completedRef.current) return
+      context.globalCompositeOperation = 'source-over'
+      context.clearRect(0, 0, width, height)
+      shapes.forEach(({ cell, index }) => {
+        context.save()
+        traceCoating(cell, index)
+        context.clip()
+        context.drawImage(coatingArtwork, 0, 0, width, height)
+        context.restore()
+      })
+      rememberOpaquePixels()
+      context.globalCompositeOperation = 'destination-out'
+    }
+    coatingArtwork.src = scratchCoatingArtworkFor(cardCode)
+    return () => { cancelled = true }
   }, [cardCode, columns, stageHeight, symbols.length])
 
   function scratch(event: React.PointerEvent<HTMLCanvasElement>) {
