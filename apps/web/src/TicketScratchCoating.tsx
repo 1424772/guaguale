@@ -11,6 +11,10 @@ const coatingCellCounts: Record<string, number> = {
   'all-in': 1,
 }
 
+export function usesFullCoatingPreview(cardCode: string) {
+  return cardCode === 'eternal-color-diamond'
+}
+
 export function TicketScratchCoating({ cardCode, progress = 0 }: { cardCode: string; progress?: number }) {
   const count = coatingCellCounts[cardCode] ?? 1
   const safeProgress = Math.max(0, Math.min(100, progress))

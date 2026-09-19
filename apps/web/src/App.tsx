@@ -7,7 +7,7 @@ import { PlateCleaning } from './PlateCleaning'
 import { getSymbolVisual, scratchLayoutFor, ScratchCard, symbolClassName, symbolStateClassNames, TicketSymbolGlyph } from './ScratchCard'
 import { ShopDialog } from './ShopDialog'
 import { RobotDialog } from './RobotDialog'
-import { TicketScratchCoating } from './TicketScratchCoating'
+import { TicketScratchCoating, usesFullCoatingPreview } from './TicketScratchCoating'
 import { ticketArtworkFor, unopenedTicketArtworkFor } from './ticketArtwork'
 
 const coinFormatter = new Intl.NumberFormat('zh-CN')
@@ -865,6 +865,7 @@ export function App() {
                 const knownProgress = slotTicket ? scratchProgress[slotTicket.id] : undefined
                 const visuallyComplete = Boolean(slotTicket && slotTicket.state !== 'purchased' && (knownProgress === undefined || knownProgress >= 100))
                 const visualProgress = knownProgress ?? (visuallyComplete ? 100 : 0)
+                const fullCoatingPreview = Boolean(slotTicket && slotTicket.state === 'purchased' && usesFullCoatingPreview(slotTicket.cardCode))
                 return (
                   <div className={`fixed-slot ${slotTicket ? 'occupied' : ''}`} key={index} ref={(element) => { slotRefs.current[index] = element }} data-slot-index={index + 1}>
                     <span>{index + 1}</span>
@@ -874,8 +875,8 @@ export function App() {
                         style={{ '--scratch-progress': `${visualProgress}%` } as CSSProperties}
                       >
                         <button type="button" onClick={() => openTicket(slotTicket)}>
-                          <img src={slotTicket.state === 'purchased' && visualProgress <= 0 ? unopenedTicketArtworkFor(slotTicket.cardCode) : ticketArtworkFor(slotTicket.cardCode)} alt={`${slotTicket.cardName}票面`} />
-                          {slotTicket.state === 'purchased' && visualProgress > 0 && <TicketScratchCoating cardCode={slotTicket.cardCode} progress={visualProgress} />}
+                          <img src={fullCoatingPreview ? ticketArtworkFor(slotTicket.cardCode) : slotTicket.state === 'purchased' && visualProgress <= 0 ? unopenedTicketArtworkFor(slotTicket.cardCode) : ticketArtworkFor(slotTicket.cardCode)} alt={`${slotTicket.cardName}票面`} />
+                          {slotTicket.state === 'purchased' && (fullCoatingPreview || visualProgress > 0) && <TicketScratchCoating cardCode={slotTicket.cardCode} progress={fullCoatingPreview ? 0 : visualProgress} />}
                           <TicketResultSurface ticket={slotTicket} compact />
                           <strong>{slotTicket.cardName}</strong>
                           <small>{!visuallyComplete

@@ -1,7 +1,7 @@
 import { PointerEvent, RefObject, useEffect, useState } from 'react'
 import type { Ticket } from './api'
 import { getSymbolVisual, symbolClassName, symbolStateClassNames, TicketSymbolGlyph } from './ScratchCard'
-import { TicketScratchCoating } from './TicketScratchCoating'
+import { TicketScratchCoating, usesFullCoatingPreview } from './TicketScratchCoating'
 import { ticketArtworkFor, unopenedTicketArtworkFor } from './ticketArtwork'
 
 export type DeskPlacement = {
@@ -44,6 +44,7 @@ export function TicketResultSurface({ ticket, compact = false }: { ticket: Ticke
 }
 
 export function DeskTicket({ ticket, deskRef, topZ, onOpen, onPin, onRobot, fanAction, motion, scratchProgress = 0, onDrop }: DeskTicketProps) {
+  const fullCoatingPreview = ticket.state === 'purchased' && usesFullCoatingPreview(ticket.cardCode)
   const [placement, setPlacement] = useState<DeskPlacement>({
     deskX: ticket.deskX,
     deskY: ticket.deskY,
@@ -120,8 +121,8 @@ export function DeskTicket({ ticket, deskRef, topZ, onOpen, onPin, onRobot, fanA
       onPointerUp={pointerEnd}
       onPointerCancel={() => setDrag(null)}
     >
-      <img className="ticket-artwork" src={ticket.state === 'purchased' && scratchProgress <= 0 ? unopenedTicketArtworkFor(ticket.cardCode) : ticketArtworkFor(ticket.cardCode)} alt="" draggable={false} />
-      {ticket.state === 'purchased' && scratchProgress > 0 && <TicketScratchCoating cardCode={ticket.cardCode} progress={scratchProgress} />}
+      <img className="ticket-artwork" src={fullCoatingPreview ? ticketArtworkFor(ticket.cardCode) : ticket.state === 'purchased' && scratchProgress <= 0 ? unopenedTicketArtworkFor(ticket.cardCode) : ticketArtworkFor(ticket.cardCode)} alt="" draggable={false} />
+      {ticket.state === 'purchased' && (fullCoatingPreview || scratchProgress > 0) && <TicketScratchCoating cardCode={ticket.cardCode} progress={fullCoatingPreview ? 0 : scratchProgress} />}
       <TicketResultSurface ticket={ticket} />
       <span className="movable-ticket-name">{ticket.cardName}</span>
       <div className="movable-ticket-scratch">
