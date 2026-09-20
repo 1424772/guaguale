@@ -15,8 +15,8 @@ func TestLingqianOddsStayNormalized(t *testing.T) {
 		if odds["none"] < 2000 {
 			t.Fatalf("luck level %d miss odds below 20%%", level)
 		}
-		if odds["jackpot"] > 2000 {
-			t.Fatalf("luck level %d jackpot odds above 20%%", level)
+		if odds["cash_stack"] > 300 {
+			t.Fatalf("luck level %d cash stack odds above 3%%", level)
 		}
 	}
 }
@@ -104,7 +104,7 @@ func TestEternalColorDiamondFinalGradeIsLowestAppraisal(t *testing.T) {
 	}
 	tierGrade := map[string]string{
 		"cracked": "裂纹级", "industrial": "工业级", "jewelry": "珠宝级", "rare": "稀有级",
-		"selected": "精选级", "collection": "典藏级", "royal": "皇室级", "eternal": "永恒级",
+		"selected": "精选级", "collection": "典藏级", "royal": "皇室级", "jackpot": "永恒级",
 	}
 	for level := uint8(0); level <= 10; level++ {
 		for attempt := 0; attempt < 80; attempt++ {
@@ -150,4 +150,74 @@ func TestAllEightCardsAreImplemented(t *testing.T) {
 			t.Fatalf("card %s is not enabled", card.Code)
 		}
 	}
+}
+
+func TestRegularCardPrizeEconomy(t *testing.T) {
+	type economy struct {
+		price   int64
+		rewards []int64
+	}
+	economies := map[string]economy{
+		"lingqian-ticket":       {price: 50, rewards: []int64{25, 50, 60, 75, 150}},
+		"street-store":          {price: 1500, rewards: namedRewards(streetResults)},
+		"arcade-challenge":      {price: 5000, rewards: namedRewards(arcadeResults)},
+		"gold-mine":             {price: 15000, rewards: namedRewards(goldMineResults)},
+		"rocket-launch":         {price: 40000, rewards: namedRewards(rocketResults)},
+		"deep-sea-salvage":      {price: 80000, rewards: namedRewards(deepSeaResults)},
+		"eternal-color-diamond": {price: 150000, rewards: namedRewards(diamondResults)},
+	}
+	for code, card := range economies {
+		losses, breakEvens, profits := 0, 0, 0
+		maximum := int64(0)
+		for _, reward := range card.rewards {
+			switch {
+			case reward < card.price:
+				losses++
+			case reward == card.price:
+				breakEvens++
+			default:
+				profits++
+			}
+			if reward > maximum {
+				maximum = reward
+			}
+		}
+		if losses != 1 || breakEvens != 1 || profits != len(card.rewards)-2 {
+			t.Fatalf("%s economy = %d loss, %d break-even, %d profit", code, losses, breakEvens, profits)
+		}
+		if maximum < card.price*2 || maximum > card.price*3 {
+			t.Fatalf("%s top prize %d is outside 2x-3x price", code, maximum)
+		}
+	}
+}
+
+func TestJackpotMechanism(t *testing.T) {
+	for code, results := range map[string][]weightedResult{
+		"street-store": streetResults, "arcade-challenge": arcadeResults, "gold-mine": goldMineResults,
+		"rocket-launch": rocketResults, "deep-sea-salvage": deepSeaResults, "eternal-color-diamond": diamondResults,
+	} {
+		jackpot := results[0]
+		card, _ := CardByCode(code)
+		if jackpot.tier != "jackpot" || jackpot.reward != card.Price*3 {
+			t.Fatalf("%s jackpot = %#v, price = %d", code, jackpot, card.Price)
+		}
+		if jackpot.base != 100 || jackpot.maximum != 200 {
+			t.Fatalf("%s jackpot odds = %d-%d basis points", code, jackpot.base, jackpot.maximum)
+		}
+	}
+
+	prize := lingqianPrizes[0]
+	if prize.tier != "cash_stack" || prize.basePrize*2 != catalog[0].Price*3 {
+		t.Fatalf("lingqian jackpot definition = %#v", prize)
+	}
+}
+
+func namedRewards(results []weightedResult) []int64 {
+	rewards := make([]int64, 0, len(results))
+	for _, result := range results {
+		if result.tier != "none" {
+			rewards = append(rewards, result.reward)
+		}
+	}
+	return rewards
 }

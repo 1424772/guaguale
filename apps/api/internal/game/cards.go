@@ -15,62 +15,62 @@ type weightedResult struct {
 }
 
 var streetResults = []weightedResult{
-	{tier: "jackpot", base: 300, maximum: 400, reward: 4500, symbol: "游戏机"},
-	{tier: "television", base: 500, maximum: 800, reward: 3000, symbol: "小电视"},
-	{tier: "toy_car", base: 600, maximum: 1000, reward: 2250, symbol: "玩具车"},
-	{tier: "ice_cream", base: 900, maximum: 1300, reward: 1800, symbol: "雪糕"},
-	{tier: "ice_pop", base: 1200, maximum: 1700, reward: 1500, symbol: "冰棍"},
-	{tier: "cola", base: 1500, maximum: 1400, reward: 1200, symbol: "可乐"},
-	{tier: "latiao", base: 1500, maximum: 1400, reward: 600, symbol: "辣条"},
+	{tier: "jackpot", base: 100, maximum: 200, reward: 4500, symbol: "游戏机"},
+	{tier: "television", base: 500, maximum: 700, reward: 3750, symbol: "小电视"},
+	{tier: "toy_car", base: 600, maximum: 800, reward: 3000, symbol: "玩具车"},
+	{tier: "ice_cream", base: 900, maximum: 1100, reward: 2250, symbol: "雪糕"},
+	{tier: "ice_pop", base: 1200, maximum: 1500, reward: 1800, symbol: "冰棍"},
+	{tier: "cola", base: 1500, maximum: 1500, reward: 1500, symbol: "可乐"},
+	{tier: "latiao", base: 1500, maximum: 1400, reward: 750, symbol: "辣条"},
 	{tier: "none", base: 3500, maximum: 2000},
 }
 
 var arcadeResults = []weightedResult{
-	{tier: "jackpot", base: 500, maximum: 700, reward: 15000, symbol: "街机皇冠"},
-	{tier: "plane", base: 1000, maximum: 1400, reward: 8000, symbol: "飞机"},
-	{tier: "race_car", base: 1500, maximum: 2400, reward: 5200, symbol: "赛车"},
-	{tier: "boxing_glove", base: 2000, maximum: 1700, reward: 4000, symbol: "拳套"},
+	{tier: "jackpot", base: 100, maximum: 200, reward: 15000, symbol: "街机皇冠"},
+	{tier: "plane", base: 1000, maximum: 1400, reward: 10000, symbol: "飞机"},
+	{tier: "race_car", base: 1500, maximum: 2400, reward: 6500, symbol: "赛车"},
+	{tier: "boxing_glove", base: 2000, maximum: 1700, reward: 5000, symbol: "拳套"},
 	{tier: "marble", base: 2000, maximum: 1800, reward: 2500, symbol: "弹珠"},
 	{tier: "none", base: 3000, maximum: 2000},
 }
 
 var goldMineResults = []weightedResult{
-	{tier: "match_6", base: 500, maximum: 700, reward: 45000, symbol: "6"},
-	{tier: "match_5", base: 900, maximum: 1400, reward: 24000, symbol: "5"},
-	{tier: "match_4", base: 1500, maximum: 2500, reward: 15000, symbol: "4"},
-	{tier: "match_3", base: 1800, maximum: 1600, reward: 12000, symbol: "3"},
+	{tier: "jackpot", base: 100, maximum: 200, reward: 45000, symbol: "6"},
+	{tier: "match_5", base: 900, maximum: 1400, reward: 30000, symbol: "5"},
+	{tier: "match_4", base: 1500, maximum: 2500, reward: 22500, symbol: "4"},
+	{tier: "match_3", base: 1800, maximum: 1600, reward: 15000, symbol: "3"},
 	{tier: "match_2", base: 2300, maximum: 1800, reward: 7500, symbol: "2"},
 	{tier: "none", base: 3000, maximum: 2000, symbol: "0"},
 }
 
 var rocketResults = []weightedResult{
-	{tier: "fuel_11_12", base: 500, maximum: 700, reward: 120000, symbol: "11-12"},
-	{tier: "fuel_9_10", base: 1000, maximum: 1500, reward: 64000, symbol: "9-10"},
-	{tier: "fuel_8", base: 1500, maximum: 2400, reward: 40000, symbol: "8"},
-	{tier: "fuel_6_7", base: 2000, maximum: 1700, reward: 32000, symbol: "6-7"},
+	{tier: "jackpot", base: 100, maximum: 200, reward: 120000, symbol: "11-12"},
+	{tier: "fuel_9_10", base: 1000, maximum: 1500, reward: 80000, symbol: "9-10"},
+	{tier: "fuel_8", base: 1500, maximum: 2400, reward: 60000, symbol: "8"},
+	{tier: "fuel_6_7", base: 2000, maximum: 1700, reward: 40000, symbol: "6-7"},
 	{tier: "fuel_4_5", base: 2000, maximum: 1700, reward: 20000, symbol: "4-5"},
 	{tier: "none", base: 3000, maximum: 2000, symbol: "0-3"},
 }
 
 var deepSeaResults = []weightedResult{
-	{tier: "crown", base: 300, maximum: 600, reward: 240000, symbol: "海神王冠"},
-	{tier: "chest", base: 800, maximum: 1800, reward: 120000, symbol: "黄金宝箱"},
-	{tier: "pearl", base: 2000, maximum: 2600, reward: 72000, symbol: "珍珠贝"},
-	{tier: "anchor", base: 2400, maximum: 2200, reward: 56000, symbol: "生锈船锚"},
-	{tier: "bottle", base: 2000, maximum: 1300, reward: 32000, symbol: "漂流瓶"},
-	{tier: "boot", base: 1500, maximum: 900, reward: 20000, symbol: "破皮靴"},
-	{tier: "seaweed", base: 1000, maximum: 600, reward: 10000, symbol: "海草团"},
+	{tier: "jackpot", base: 100, maximum: 200, reward: 240000, symbol: "海神王冠"},
+	{tier: "chest", base: 200, maximum: 300, reward: 200000, symbol: "黄金宝箱"},
+	{tier: "pearl", base: 400, maximum: 500, reward: 160000, symbol: "珍珠贝"},
+	{tier: "anchor", base: 700, maximum: 800, reward: 120000, symbol: "生锈船锚"},
+	{tier: "bottle", base: 1000, maximum: 1200, reward: 96000, symbol: "漂流瓶"},
+	{tier: "boot", base: 2000, maximum: 2200, reward: 80000, symbol: "破皮靴"},
+	{tier: "seaweed", base: 5600, maximum: 4800, reward: 40000, symbol: "海草团"},
 }
 
 var diamondResults = []weightedResult{
-	{tier: "eternal", base: 150, maximum: 300, reward: 450000, symbol: "永恒级"},
-	{tier: "royal", base: 350, maximum: 600, reward: 270000, symbol: "皇室级"},
-	{tier: "collection", base: 600, maximum: 1100, reward: 180000, symbol: "典藏级"},
-	{tier: "selected", base: 1000, maximum: 1500, reward: 157500, symbol: "精选级"},
-	{tier: "rare", base: 1200, maximum: 1800, reward: 150000, symbol: "稀有级"},
-	{tier: "jewelry", base: 1800, maximum: 1800, reward: 120000, symbol: "珠宝级"},
-	{tier: "industrial", base: 2200, maximum: 1600, reward: 75000, symbol: "工业级"},
-	{tier: "cracked", base: 2700, maximum: 1300, reward: 30000, symbol: "裂纹级"},
+	{tier: "jackpot", base: 100, maximum: 200, reward: 450000, symbol: "永恒级"},
+	{tier: "royal", base: 150, maximum: 250, reward: 375000, symbol: "皇室级"},
+	{tier: "collection", base: 200, maximum: 350, reward: 300000, symbol: "典藏级"},
+	{tier: "selected", base: 300, maximum: 500, reward: 240000, symbol: "精选级"},
+	{tier: "rare", base: 400, maximum: 600, reward: 225000, symbol: "稀有级"},
+	{tier: "jewelry", base: 700, maximum: 900, reward: 180000, symbol: "珠宝级"},
+	{tier: "industrial", base: 1500, maximum: 1800, reward: 150000, symbol: "工业级"},
+	{tier: "cracked", base: 6650, maximum: 5400, reward: 75000, symbol: "裂纹级"},
 }
 
 var diamondGrades = []string{"裂纹级", "工业级", "珠宝级", "稀有级", "精选级", "典藏级", "皇室级", "永恒级"}

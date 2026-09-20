@@ -123,7 +123,7 @@ export function App() {
             robotOutputTimerRef.current = null
           }, 1900)
           setNotice(finished.reward
-            ? `机器人吐出《${finished.cardName}》，中奖 ${coinFormatter.format(finished.reward)} 金币，请手动兑奖`
+            ? `${finished.prizeTier === 'jackpot' ? '🎉 命中头奖！' : ''}机器人吐出《${finished.cardName}》，中奖 ${coinFormatter.format(finished.reward)} 金币，请手动兑奖`
             : `机器人吐出《${finished.cardName}》，本张未中奖`)
         }
       } catch (error) {
@@ -398,6 +398,9 @@ export function App() {
       setActiveTicket((current) => current?.id === response.ticket.id ? response.ticket : current)
       rememberScratchProgress(ticketId, 100)
       setScratchComplete(true)
+      if (response.ticket.prizeTier === 'jackpot') {
+        setNotice(`🎉 命中头奖！《${response.ticket.cardName}》获得 ${coinFormatter.format(response.ticket.reward ?? 0)} 金币`)
+      }
     } catch (error) {
       setNotice(messageFrom(error))
     } finally {
@@ -1012,7 +1015,7 @@ export function App() {
             {activeTicket.cardCode === 'eternal-color-diamond' && <p className="special-card-rule">五项鉴定中，以最低等级作为本张彩钻的最终等级。</p>}
             {activeTicket.cardCode === 'all-in' && <p className="special-card-rule danger">固定结果规则 · 好运道具无效 · 机器人禁用 · 仅可手动刮开</p>}
             {scratchComplete && (
-              <div className={`result-box card-result-${activeTicket.cardCode} tier-${activeTicket.prizeTier ?? 'none'} ${activeTicket.reward ? 'winner' : 'loser'}`}>
+              <div className={`result-box card-result-${activeTicket.cardCode} tier-${activeTicket.prizeTier ?? 'none'} ${activeTicket.reward ? 'winner' : 'loser'} ${activeTicket.prizeTier === 'jackpot' ? 'jackpot-hit' : ''}`}>
                 <small>本张结果</small>
                 <h2>{ticketResultTitle(activeTicket)}</h2>
                 <p>{activeTicket.reward ? '把中奖卡放入兑奖区即可入账。' : '未中奖卡将继续留在桌面，后续可丢入垃圾桶。'}</p>
@@ -1286,16 +1289,17 @@ function ResultSymbols({ cardCode, cardName, symbols, prizeTier = 'none' }: { ca
 }
 
 function ticketResultTitle(ticket: Ticket) {
+  const jackpotPrefix = ticket.prizeTier === 'jackpot' ? '🎉 头奖 · ' : ''
   if (ticket.cardCode === 'eternal-color-diamond') {
     const grades = ['裂纹级', '工业级', '珠宝级', '稀有级', '精选级', '典藏级', '皇室级', '永恒级']
     const finalGrade = (ticket.symbols ?? []).reduce((lowest, grade) => grades.indexOf(grade) < grades.indexOf(lowest) ? grade : lowest, '永恒级')
-    return `最终鉴定 ${finalGrade} · 获得 ${coinFormatter.format(ticket.reward ?? 0)} 金币`
+    return `${jackpotPrefix}最终鉴定 ${finalGrade} · 获得 ${coinFormatter.format(ticket.reward ?? 0)} 金币`
   }
   if (ticket.cardCode === 'all-in') {
     const symbol = ticket.symbols?.[0] ?? '骷髅头'
     return ticket.reward ? `${symbol} · 获得 ${coinFormatter.format(ticket.reward)} 金币` : `${symbol} · 未中奖`
   }
-  return ticket.reward ? `获得 ${coinFormatter.format(ticket.reward)} 金币` : '未中奖'
+  return ticket.reward ? `${jackpotPrefix}获得 ${coinFormatter.format(ticket.reward)} 金币` : '未中奖'
 }
 
 function messageFrom(error: unknown) {

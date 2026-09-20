@@ -17,10 +17,10 @@ type prizeDefinition struct {
 }
 
 var lingqianPrizes = []prizeDefinition{
-	{tier: "jackpot", symbol: "钞票堆", baseOdds: 500, maxOdds: 650, basePrize: 200},
-	{tier: "first", symbol: "碎钻石", baseOdds: 1000, maxOdds: 1250, basePrize: 100},
+	{tier: "cash_stack", symbol: "钞票堆", baseOdds: 200, maxOdds: 300, basePrize: 75},
+	{tier: "first", symbol: "碎钻石", baseOdds: 1000, maxOdds: 1250, basePrize: 60},
 	{tier: "second", symbol: "钞票", baseOdds: 2000, maxOdds: 2400, basePrize: 50},
-	{tier: "third", symbol: "狗头金币", baseOdds: 3000, maxOdds: 3700, basePrize: 20},
+	{tier: "third", symbol: "狗头金币", baseOdds: 3000, maxOdds: 3700, basePrize: 25},
 }
 
 var luckCoefficients = [...]int{0, 400, 800, 1300, 2000, 2900, 4000, 5300, 6800, 8400, 10000}
@@ -80,7 +80,11 @@ func winningOutcome(prize prizeDefinition) (domain.Outcome, error) {
 	if triple {
 		reward *= 2
 	}
-	return domain.Outcome{PrizeTier: prize.tier, Reward: reward, Symbols: symbols}, nil
+	tier := prize.tier
+	if triple && prize.tier == "cash_stack" {
+		tier = "jackpot"
+	}
+	return domain.Outcome{PrizeTier: tier, Reward: reward, Symbols: symbols}, nil
 }
 
 func losingOutcome() (domain.Outcome, error) {

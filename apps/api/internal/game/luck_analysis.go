@@ -55,8 +55,12 @@ func lingqianImpact(currentLevel, nextLevel uint8) domain.LuckCardImpact {
 	tiers := make([]domain.LuckTierImpact, 0, len(lingqianPrizes)+1)
 	currentExpected, nextExpected := int64(0), int64(0)
 	for _, prize := range lingqianPrizes {
+		label := prize.symbol
+		if prize.tier == "cash_stack" {
+			label += "（三同图为头奖）"
+		}
 		tiers = append(tiers, domain.LuckTierImpact{
-			Label: prize.symbol, RewardText: fmt.Sprintf("%d金币；三同%d金币", prize.basePrize, prize.basePrize*2),
+			Label: label, RewardText: fmt.Sprintf("%d金币；三同%d金币", prize.basePrize, prize.basePrize*2),
 			CurrentBasisPoint: currentOdds[prize.tier], NextBasisPoint: nextOdds[prize.tier],
 		})
 		currentExpected += int64(currentOdds[prize.tier]) * prize.basePrize * 105
@@ -99,6 +103,9 @@ func resultRTP(results []weightedResult, weights []int, price int64) int {
 func impactLabel(cardCode string, result weightedResult) string {
 	if result.tier == "none" {
 		return "未中奖"
+	}
+	if result.tier == "jackpot" {
+		return "头奖 · " + result.symbol
 	}
 	switch cardCode {
 	case "gold-mine":

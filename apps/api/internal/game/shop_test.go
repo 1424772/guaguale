@@ -40,7 +40,7 @@ func TestLuckCardImpactsMatchBaseConfiguration(t *testing.T) {
 	if len(impacts) != 7 {
 		t.Fatalf("expected seven implemented luck cards, got %#v", impacts)
 	}
-	wantRTP := []int{7560, 6880, 7260, 7030, 7200, 6880, 7130}
+	wantRTP := []int{5250, 7790, 7250, 7300, 7550, 8650, 7820}
 	for index, impact := range impacts {
 		if impact.CurrentRTPBasisPoint != wantRTP[index] {
 			t.Fatalf("%s RTP = %d, want %d", impact.CardName, impact.CurrentRTPBasisPoint, wantRTP[index])
@@ -55,7 +55,15 @@ func TestLuckCardImpactsMatchBaseConfiguration(t *testing.T) {
 		}
 	}
 	maxImpacts := LuckCardImpacts(10)
-	if maxImpacts[6].CurrentRTPBasisPoint != 9175 {
-		t.Fatalf("max-luck diamond RTP = %d, want 9175", maxImpacts[6].CurrentRTPBasisPoint)
+	for index, impact := range maxImpacts {
+		if impact.CurrentRTPBasisPoint <= impacts[index].CurrentRTPBasisPoint {
+			t.Fatalf("%s max-luck RTP %d did not improve on base %d", impact.CardName, impact.CurrentRTPBasisPoint, impacts[index].CurrentRTPBasisPoint)
+		}
+		if impact.CurrentRTPBasisPoint > 10000 {
+			t.Fatalf("%s max-luck RTP %d exceeds 100%%", impact.CardName, impact.CurrentRTPBasisPoint)
+		}
+	}
+	if maxImpacts[6].CurrentRTPBasisPoint != 9205 {
+		t.Fatalf("max-luck diamond RTP = %d, want 9205", maxImpacts[6].CurrentRTPBasisPoint)
 	}
 }
