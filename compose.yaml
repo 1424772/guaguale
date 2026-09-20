@@ -8,6 +8,7 @@ services:
     restart: unless-stopped
     ports:
       - "80:80"
+      - "127.0.0.1:8081:8081"
     depends_on:
       api:
         condition: service_healthy
