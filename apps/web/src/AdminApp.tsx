@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react'
 import { adminApi, ApiError, type AdminUser } from './api'
+import { newIdempotencyKey } from './idempotency'
 import './admin.css'
 
 const coinFormatter = new Intl.NumberFormat('zh-CN')
@@ -79,7 +80,7 @@ export function AdminApp() {
     setError('')
     setNotice('')
     try {
-      const idempotencyKey = globalThis.crypto.randomUUID()
+      const idempotencyKey = newIdempotencyKey('admin-balance')
       const result = await adminApi.adjustBalance(selected.id, mode, parsedAmount, idempotencyKey)
       setUsers((current) => current.map((user) => user.id === result.user.id ? result.user : user))
       setSelected(result.user)

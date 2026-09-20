@@ -9,15 +9,9 @@ import { ShopDialog } from './ShopDialog'
 import { RobotDialog } from './RobotDialog'
 import { TicketScratchCoating, usesFullCoatingPreview } from './TicketScratchCoating'
 import { ticketArtworkFor, unopenedTicketArtworkFor } from './ticketArtwork'
+import { newIdempotencyKey } from './idempotency'
 
 const coinFormatter = new Intl.NumberFormat('zh-CN')
-
-function newIdempotencyKey(prefix: string) {
-  if (typeof globalThis.crypto?.randomUUID === 'function') {
-    return `${prefix}-${globalThis.crypto.randomUUID()}`
-  }
-  return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 14)}`
-}
 
 function updateUnlocks(cards: Card[], balance: number) {
   return cards.map((card) => ({ ...card, unlocked: balance >= card.price }))
