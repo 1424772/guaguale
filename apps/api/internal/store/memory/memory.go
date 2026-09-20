@@ -537,6 +537,25 @@ func (store *Store) DiscardTicket(_ context.Context, userID uint64, ticketID str
 	return revealTicket(ticket), nil
 }
 
+func (store *Store) RestoreDiscardedTicket(_ context.Context, userID uint64, ticketID string, now time.Time) (domain.Ticket, error) {
+	store.mu.Lock()
+	defer store.mu.Unlock()
+	ticket, exists := store.tickets[ticketID]
+	if !exists || ticket.UserID != userID {
+		return domain.Ticket{}, basestore.ErrNotFound
+	}
+	if ticket.State != domain.TicketDiscarded || ticket.DiscardedAt == nil || now.After(ticket.DiscardedAt.Add(15*time.Second)) {
+		return domain.Ticket{}, basestore.ErrInvalidState
+	}
+	ticket.State = domain.TicketPurchased
+	if ticket.ScratchedAt != nil {
+		ticket.State = domain.TicketScratched
+	}
+	ticket.DiscardedAt = nil
+	store.tickets[ticketID] = ticket
+	return revealTicket(ticket), nil
+}
+
 func boolLevel(value bool) uint8 {
 	if value {
 		return 1

@@ -811,6 +811,34 @@ func (store *Store) DiscardTicket(ctx context.Context, userID uint64, ticketID s
 	return revealTicket(ticket), nil
 }
 
+func (store *Store) RestoreDiscardedTicket(ctx context.Context, userID uint64, ticketID string, now time.Time) (domain.Ticket, error) {
+	tx, err := store.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
+	if err != nil {
+		return domain.Ticket{}, err
+	}
+	defer tx.Rollback()
+	ticket, err := lockedTicket(ctx, tx, userID, ticketID)
+	if err != nil {
+		return domain.Ticket{}, err
+	}
+	if ticket.State != domain.TicketDiscarded || ticket.DiscardedAt == nil || now.After(ticket.DiscardedAt.Add(15*time.Second)) {
+		return domain.Ticket{}, basestore.ErrInvalidState
+	}
+	restoredState := domain.TicketPurchased
+	if ticket.ScratchedAt != nil {
+		restoredState = domain.TicketScratched
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE tickets SET state = ?, discarded_at = NULL WHERE id = ?`, restoredState, ticketID); err != nil {
+		return domain.Ticket{}, err
+	}
+	ticket.State = restoredState
+	ticket.DiscardedAt = nil
+	if err := tx.Commit(); err != nil {
+		return domain.Ticket{}, err
+	}
+	return revealTicket(ticket), nil
+}
+
 type scanner interface {
 	Scan(...any) error
 }

@@ -83,6 +83,7 @@ func NewWithAdmin(service *service.Service, store store.Store, logger *slog.Logg
 	mux.Handle("POST /api/v1/tickets/{id}/redeem", api.requireUser(http.HandlerFunc(api.redeem)))
 	mux.Handle("PATCH /api/v1/tickets/{id}/placement", api.requireUser(http.HandlerFunc(api.placeTicket)))
 	mux.Handle("POST /api/v1/tickets/{id}/discard", api.requireUser(http.HandlerFunc(api.discardTicket)))
+	mux.Handle("POST /api/v1/tickets/{id}/restore", api.requireUser(http.HandlerFunc(api.restoreDiscardedTicket)))
 	mux.Handle("GET /api/v1/robot", api.requireUser(http.HandlerFunc(api.robotStatus)))
 	mux.Handle("POST /api/v1/robot/tickets/{id}", api.requireUser(http.HandlerFunc(api.enqueueRobot)))
 	mux.Handle("POST /api/v1/robot/tick", api.requireUser(http.HandlerFunc(api.tickRobot)))
@@ -277,6 +278,15 @@ func (api *API) placeTicket(response http.ResponseWriter, request *http.Request)
 
 func (api *API) discardTicket(response http.ResponseWriter, request *http.Request) {
 	ticket, err := api.service.DiscardTicket(request.Context(), currentUser(request).ID, request.PathValue("id"))
+	if err != nil {
+		api.writeError(response, request, err)
+		return
+	}
+	writeJSON(response, http.StatusOK, map[string]any{"ticket": ticket})
+}
+
+func (api *API) restoreDiscardedTicket(response http.ResponseWriter, request *http.Request) {
+	ticket, err := api.service.RestoreDiscardedTicket(request.Context(), currentUser(request).ID, request.PathValue("id"))
 	if err != nil {
 		api.writeError(response, request, err)
 		return

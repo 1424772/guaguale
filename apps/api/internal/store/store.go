@@ -129,6 +129,7 @@ type Store interface {
 	RedeemTicket(context.Context, uint64, string) (domain.User, domain.Ticket, bool, error)
 	UpdateTicketPlacement(context.Context, uint64, string, TicketPlacement) (domain.Ticket, error)
 	DiscardTicket(context.Context, uint64, string, time.Time) (domain.Ticket, error)
+	RestoreDiscardedTicket(context.Context, uint64, string, time.Time) (domain.Ticket, error)
 	UpgradeItem(context.Context, UpgradeItemInput) (domain.User, domain.ItemUpgrade, bool, error)
 	ListRobotQueue(context.Context, uint64) ([]domain.RobotQueueItem, error)
 	EnqueueRobot(context.Context, EnqueueRobotInput) (domain.Ticket, []domain.RobotQueueItem, error)

@@ -290,6 +290,9 @@ func TestDeskPlacementSlotsAndDiscard(t *testing.T) {
 	if err != nil || placed.Location != domain.TicketOnDesk || placed.SlotIndex != nil {
 		t.Fatalf("return to desk = %#v, %v", placed, err)
 	}
+	if _, err := service.Scratch(ctx, authResult.User.ID, first.Ticket.ID); err != nil {
+		t.Fatalf("scratch before discard: %v", err)
+	}
 	if _, err := service.DiscardTicket(ctx, authResult.User.ID, first.Ticket.ID); err != nil {
 		t.Fatal(err)
 	}
@@ -299,6 +302,14 @@ func TestDeskPlacementSlotsAndDiscard(t *testing.T) {
 	}
 	if len(tickets) != 1 || tickets[0].ID != second.Ticket.ID {
 		t.Fatalf("discarded ticket remained visible: %#v", tickets)
+	}
+	restored, err := service.RestoreDiscardedTicket(ctx, authResult.User.ID, first.Ticket.ID)
+	if err != nil || restored.State != domain.TicketScratched {
+		t.Fatalf("restore discarded ticket = %#v, %v", restored, err)
+	}
+	tickets, err = service.Tickets(ctx, authResult.User.ID)
+	if err != nil || len(tickets) != 2 {
+		t.Fatalf("restored ticket did not return to active list: %#v, %v", tickets, err)
 	}
 }
 

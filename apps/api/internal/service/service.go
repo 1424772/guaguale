@@ -518,6 +518,13 @@ func (service *Service) DiscardTicket(ctx context.Context, userID uint64, ticket
 	return service.store.DiscardTicket(ctx, userID, ticketID, service.now().UTC())
 }
 
+func (service *Service) RestoreDiscardedTicket(ctx context.Context, userID uint64, ticketID string) (domain.Ticket, error) {
+	if !validTicketID(ticketID) {
+		return domain.Ticket{}, ErrInvalidInput
+	}
+	return service.store.RestoreDiscardedTicket(ctx, userID, ticketID, service.now().UTC())
+}
+
 func (service *Service) createSession(ctx context.Context, user domain.User) (AuthResult, error) {
 	now := service.now().UTC()
 	token, session, err := auth.NewSession(user.ID, now)

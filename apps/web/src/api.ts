@@ -325,6 +325,10 @@ export const api = {
   }),
   discardTicket: (ticketId: string) => request<{ ticket: Ticket }>(`/api/v1/tickets/${ticketId}/discard`, {
     method: 'POST',
+    keepalive: true,
+  }),
+  restoreDiscardedTicket: (ticketId: string) => request<{ ticket: Ticket }>(`/api/v1/tickets/${ticketId}/restore`, {
+    method: 'POST',
   }),
   robot: () => request<{ robot: RobotStatus }>('/api/v1/robot'),
   enqueueRobot: (ticketId: string) => request<{ ticket: Ticket; robot: RobotStatus }>(`/api/v1/robot/tickets/${ticketId}`, {

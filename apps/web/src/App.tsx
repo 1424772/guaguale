@@ -634,39 +634,57 @@ export function App() {
   }
 
   function queueDiscard(ticket: Ticket) {
+    if (discardingTicketId) return
     if (discardTimerRef.current !== null) window.clearTimeout(discardTimerRef.current)
     if (discardAnimationTimerRef.current !== null) window.clearTimeout(discardAnimationTimerRef.current)
-    if (pendingDiscard) void persistDiscard(pendingDiscard)
+    if (pendingDiscard) setPendingDiscard(null)
     setDiscardingTicketId(ticket.id)
     setNotice(`正在丢弃《${ticket.cardName}》…`)
+    void persistDiscard(ticket)
     discardAnimationTimerRef.current = window.setTimeout(() => {
+      discardAnimationTimerRef.current = null
       setDiscardingTicketId(null)
       setTickets((current) => current.filter((item) => item.id !== ticket.id))
       setPendingDiscard(ticket)
       setNotice(`《${ticket.cardName}》已放入垃圾桶，5秒内可以撤销`)
-      discardTimerRef.current = window.setTimeout(() => void persistDiscard(ticket), 5000)
+      discardTimerRef.current = window.setTimeout(() => {
+        discardTimerRef.current = null
+        setPendingDiscard((current) => current?.id === ticket.id ? null : current)
+      }, 5000)
     }, 950)
   }
 
   async function persistDiscard(ticket: Ticket) {
-    discardTimerRef.current = null
     try {
       await api.discardTicket(ticket.id)
-      setPendingDiscard((current) => current?.id === ticket.id ? null : current)
     } catch (error) {
+      if (discardAnimationTimerRef.current !== null) window.clearTimeout(discardAnimationTimerRef.current)
+      if (discardTimerRef.current !== null) window.clearTimeout(discardTimerRef.current)
+      discardAnimationTimerRef.current = null
+      discardTimerRef.current = null
+      setDiscardingTicketId((current) => current === ticket.id ? null : current)
       setTickets((current) => current.some((item) => item.id === ticket.id) ? current : [ticket, ...current])
       setPendingDiscard((current) => current?.id === ticket.id ? null : current)
       setNotice(messageFrom(error))
     }
   }
 
-  function undoDiscard() {
-    if (!pendingDiscard) return
+  async function undoDiscard() {
+    if (!pendingDiscard || busy) return
+    const ticket = pendingDiscard
     if (discardTimerRef.current !== null) window.clearTimeout(discardTimerRef.current)
     discardTimerRef.current = null
-    setTickets((current) => [pendingDiscard, ...current])
-    setNotice(`已撤销丢弃《${pendingDiscard.cardName}》`)
-    setPendingDiscard(null)
+    setBusy(true)
+    try {
+      const result = await api.restoreDiscardedTicket(ticket.id)
+      setTickets((current) => current.some((item) => item.id === result.ticket.id) ? current : [result.ticket, ...current])
+      setNotice(`已撤销丢弃《${ticket.cardName}》`)
+      setPendingDiscard(null)
+    } catch (error) {
+      setNotice(messageFrom(error))
+    } finally {
+      setBusy(false)
+    }
   }
 
   function startFanHold(event: ReactPointerEvent<HTMLButtonElement>) {
