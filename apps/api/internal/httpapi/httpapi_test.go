@@ -9,6 +9,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"golang.org/x/crypto/bcrypt"
+
 	"github.com/1424772/guaguale/apps/api/internal/service"
 	"github.com/1424772/guaguale/apps/api/internal/store/memory"
 )
@@ -92,6 +94,57 @@ func TestRegisterRequiresAgeConfirmationAndPurchaseIsIdempotent(t *testing.T) {
 	history := getJSON(t, handler, "/api/v1/history", cookies[0])
 	if history.Code != http.StatusOK || !bytes.Contains(history.Body.Bytes(), []byte("购买刮刮乐")) {
 		t.Fatalf("history endpoint did not return purchase event: %d %s", history.Code, history.Body.String())
+	}
+}
+
+func TestAdminCanSearchAndAdjustBalanceIdempotently(t *testing.T) {
+	memoryStore := memory.New()
+	passwordHash, err := bcrypt.GenerateFromPassword([]byte("admin-test-password"), bcrypt.MinCost)
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler := NewWithAdmin(
+		service.New(memoryStore), memoryStore, slog.New(slog.NewTextHandler(io.Discard, nil)), false,
+		AdminConfig{Username: "admin", PasswordHash: passwordHash, SessionSecret: bytes.Repeat([]byte{7}, 32)},
+	)
+
+	registered := postJSON(t, handler, "/api/v1/auth/register", map[string]any{
+		"username": "managed_player", "password": "correct-horse-42", "ageConfirmed": true,
+	}, nil, "")
+	if registered.Code != http.StatusCreated {
+		t.Fatalf("register player: %d %s", registered.Code, registered.Body.String())
+	}
+
+	unauthorized := getJSON(t, handler, "/api/v1/admin/users", nil)
+	if unauthorized.Code != http.StatusUnauthorized {
+		t.Fatalf("admin users should require login, got %d", unauthorized.Code)
+	}
+	login := postJSON(t, handler, "/api/v1/admin/login", map[string]any{
+		"username": "admin", "password": "admin-test-password",
+	}, nil, "")
+	if login.Code != http.StatusOK {
+		t.Fatalf("admin login failed: %d %s", login.Code, login.Body.String())
+	}
+	adminCookies := login.Result().Cookies()
+	if len(adminCookies) != 1 || adminCookies[0].Name != adminCookieName || !adminCookies[0].HttpOnly {
+		t.Fatalf("expected HttpOnly admin cookie, got %#v", adminCookies)
+	}
+
+	users := getJSON(t, handler, "/api/v1/admin/users?query=managed", adminCookies[0])
+	if users.Code != http.StatusOK || !bytes.Contains(users.Body.Bytes(), []byte("managed_player")) {
+		t.Fatalf("admin search failed: %d %s", users.Code, users.Body.String())
+	}
+	adjust := postJSON(t, handler, "/api/v1/admin/users/1/balance", map[string]any{
+		"mode": "add", "amount": 20000,
+	}, adminCookies[0], "admin-test-adjust-0001")
+	if adjust.Code != http.StatusOK || !bytes.Contains(adjust.Body.Bytes(), []byte(`"balance":21000`)) {
+		t.Fatalf("admin adjustment failed: %d %s", adjust.Code, adjust.Body.String())
+	}
+	retry := postJSON(t, handler, "/api/v1/admin/users/1/balance", map[string]any{
+		"mode": "add", "amount": 20000,
+	}, adminCookies[0], "admin-test-adjust-0001")
+	if retry.Code != http.StatusOK || !bytes.Contains(retry.Body.Bytes(), []byte(`"balance":21000`)) || !bytes.Contains(retry.Body.Bytes(), []byte(`"idempotent":true`)) {
+		t.Fatalf("admin adjustment retry was not idempotent: %d %s", retry.Code, retry.Body.String())
 	}
 }
 

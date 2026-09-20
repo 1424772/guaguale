@@ -93,6 +93,28 @@ type BlowFanInput struct {
 	Roll             FanRollFunc
 }
 
+type AdminUser struct {
+	ID             uint64    `json:"id"`
+	Username       string    `json:"username"`
+	Balance        int64     `json:"balance"`
+	LuckLevel      uint8     `json:"luckLevel"`
+	ScratchLevel   uint8     `json:"scratchLevel"`
+	TrashOwned     bool      `json:"trashOwned"`
+	CardSlotsOwned bool      `json:"cardSlotsOwned"`
+	FanLevel       uint8     `json:"fanLevel"`
+	RobotOwned     bool      `json:"robotOwned"`
+	TicketCount    int       `json:"ticketCount"`
+	CreatedAt      time.Time `json:"createdAt"`
+	UpdatedAt      time.Time `json:"updatedAt"`
+}
+
+type AdminBalanceInput struct {
+	UserID         uint64
+	Mode           string
+	Amount         int64
+	IdempotencyKey string
+}
+
 type Store interface {
 	Ping(context.Context) error
 	CreateUser(context.Context, string, string, int64) (domain.User, error)
@@ -121,4 +143,6 @@ type Store interface {
 	TopPlayers(context.Context, int) ([]domain.RankedUser, error)
 	PlayerRank(context.Context, uint64) (domain.RankedUser, int, error)
 	GameHistory(context.Context, uint64, int) ([]domain.HistoryEvent, error)
+	AdminUsers(context.Context, string, int) ([]AdminUser, error)
+	AdminAdjustBalance(context.Context, AdminBalanceInput) (AdminUser, bool, error)
 }

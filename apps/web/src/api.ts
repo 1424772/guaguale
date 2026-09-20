@@ -15,6 +15,21 @@ export type User = {
   createdAt: string
 }
 
+export type AdminUser = {
+  id: number
+  username: string
+  balance: number
+  luckLevel: number
+  scratchLevel: number
+  trashOwned: boolean
+  cardSlotsOwned: boolean
+  fanLevel: number
+  robotOwned: boolean
+  ticketCount: number
+  createdAt: string
+  updatedAt: string
+}
+
 export type ShopItem = {
   code: 'luck' | 'scratch-range' | 'trash' | 'card-slots' | 'fan' | 'robot' | 'robot-speed' | 'robot-queue' | 'robot-intercept'
   name: string
@@ -323,5 +338,22 @@ export const api = {
     method: 'POST',
     headers: { 'Idempotency-Key': eventId },
     body: JSON.stringify({ acknowledgeRisk }),
+  }),
+}
+
+export const adminApi = {
+  login: (username: string, password: string) => request<{ authenticated: boolean; expiresAt: string }>('/api/v1/admin/login', {
+    method: 'POST',
+    body: JSON.stringify({ username, password }),
+  }),
+  logout: () => request<void>('/api/v1/admin/logout', { method: 'POST' }),
+  users: (query = '') => request<{ users: AdminUser[] }>(`/api/v1/admin/users?query=${encodeURIComponent(query)}`),
+  adjustBalance: (userId: number, mode: 'add' | 'subtract' | 'set', amount: number, idempotencyKey: string) => request<{
+    user: AdminUser
+    idempotent: boolean
+  }>(`/api/v1/admin/users/${userId}/balance`, {
+    method: 'POST',
+    headers: { 'Idempotency-Key': idempotencyKey },
+    body: JSON.stringify({ mode, amount }),
   }),
 }

@@ -32,6 +32,7 @@ type Store struct {
 	fanEvents         map[string]domain.FanEvent
 	balanceRankedAt   map[uint64]time.Time
 	robotProcessed    map[string]bool
+	adminAdjustments  map[string]uint64
 }
 
 type robotJob struct {
@@ -62,6 +63,7 @@ func New() *Store {
 		fanEvents:         make(map[string]domain.FanEvent),
 		balanceRankedAt:   make(map[uint64]time.Time),
 		robotProcessed:    make(map[string]bool),
+		adminAdjustments:  make(map[string]uint64),
 	}
 }
 

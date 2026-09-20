@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"database/sql"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -45,7 +46,12 @@ func main() {
 	leaderboardCache, closeCache := initializeLeaderboardCache(logger)
 	defer closeCache()
 	serviceLayer := service.NewWithLeaderboardCache(applicationStore, leaderboardCache)
-	handler := httpapi.New(serviceLayer, applicationStore, logger, envBool("COOKIE_SECURE", false))
+	adminConfig, err := loadAdminConfig()
+	if err != nil {
+		logger.Error("load admin configuration", "error", err)
+		os.Exit(1)
+	}
+	handler := httpapi.NewWithAdmin(serviceLayer, applicationStore, logger, envBool("COOKIE_SECURE", false), adminConfig)
 	server := &http.Server{
 		Addr:              ":" + envString("API_PORT", defaultPort),
 		Handler:           httpapi.RequestLogger(logger, handler),
@@ -75,6 +81,30 @@ func main() {
 		logger.Error("graceful shutdown failed", "error", err)
 		os.Exit(1)
 	}
+}
+
+func loadAdminConfig() (httpapi.AdminConfig, error) {
+	username := os.Getenv("ADMIN_USERNAME")
+	passwordHashEncoded := os.Getenv("ADMIN_PASSWORD_HASH_B64")
+	sessionSecretEncoded := os.Getenv("ADMIN_SESSION_SECRET_B64")
+	if username == "" && passwordHashEncoded == "" && sessionSecretEncoded == "" {
+		return httpapi.AdminConfig{}, nil
+	}
+	if username == "" || passwordHashEncoded == "" || sessionSecretEncoded == "" {
+		return httpapi.AdminConfig{}, errors.New("ADMIN_USERNAME, ADMIN_PASSWORD_HASH_B64 and ADMIN_SESSION_SECRET_B64 must be set together")
+	}
+	passwordHash, err := base64.StdEncoding.DecodeString(passwordHashEncoded)
+	if err != nil {
+		return httpapi.AdminConfig{}, fmt.Errorf("decode ADMIN_PASSWORD_HASH_B64: %w", err)
+	}
+	sessionSecret, err := base64.StdEncoding.DecodeString(sessionSecretEncoded)
+	if err != nil {
+		return httpapi.AdminConfig{}, fmt.Errorf("decode ADMIN_SESSION_SECRET_B64: %w", err)
+	}
+	if len(sessionSecret) < 32 {
+		return httpapi.AdminConfig{}, errors.New("ADMIN_SESSION_SECRET_B64 must decode to at least 32 bytes")
+	}
+	return httpapi.AdminConfig{Username: username, PasswordHash: passwordHash, SessionSecret: sessionSecret}, nil
 }
 
 func initializeLeaderboardCache(logger *slog.Logger) (service.LeaderboardCache, func()) {

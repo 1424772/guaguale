@@ -21,6 +21,7 @@ type API struct {
 	store        store.Store
 	logger       *slog.Logger
 	cookieSecure bool
+	admin        AdminConfig
 }
 
 type contextKey string
@@ -57,7 +58,11 @@ type errorResponse struct {
 }
 
 func New(service *service.Service, store store.Store, logger *slog.Logger, cookieSecure bool) http.Handler {
-	api := &API{service: service, store: store, logger: logger, cookieSecure: cookieSecure}
+	return NewWithAdmin(service, store, logger, cookieSecure, AdminConfig{})
+}
+
+func NewWithAdmin(service *service.Service, store store.Store, logger *slog.Logger, cookieSecure bool, admin AdminConfig) http.Handler {
+	api := &API{service: service, store: store, logger: logger, cookieSecure: cookieSecure, admin: admin}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", api.health)
 	mux.HandleFunc("GET /api/v1/health", api.health)
@@ -88,6 +93,10 @@ func New(service *service.Service, store store.Store, logger *slog.Logger, cooki
 	mux.Handle("POST /api/v1/daily/plates/start", api.requireUser(http.HandlerFunc(api.startPlate)))
 	mux.Handle("POST /api/v1/daily/plates/{id}/complete", api.requireUser(http.HandlerFunc(api.completePlate)))
 	mux.Handle("POST /api/v1/daily/wheel/spin", api.requireUser(http.HandlerFunc(api.spinDailyWheel)))
+	mux.HandleFunc("POST /api/v1/admin/login", api.adminLogin)
+	mux.HandleFunc("POST /api/v1/admin/logout", api.adminLogout)
+	mux.Handle("GET /api/v1/admin/users", api.requireAdmin(http.HandlerFunc(api.adminUsers)))
+	mux.Handle("POST /api/v1/admin/users/{id}/balance", api.requireAdmin(http.HandlerFunc(api.adminBalance)))
 	return api.securityHeaders(api.limitBody(mux))
 }
 
