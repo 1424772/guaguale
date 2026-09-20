@@ -1007,6 +1007,7 @@ export function App() {
             <button className="close-button" type="button" onClick={() => setActiveTicket(null)} aria-label="关闭">×</button>
             <img className="scratch-zoom-artwork" src={ticketArtworkFor(activeTicket.cardCode)} alt={`${activeTicket.cardName}刮刮乐票面`} />
             <div className="scratch-zoom-layer">
+            {scratchRequired && !scratchComplete && <TicketPrizeGuide cardCode={activeTicket.cardCode} />}
             {scratchRequired ? (
               <ScratchCard cardCode={activeTicket.cardCode} cardName={activeTicket.cardName} symbols={activeTicket.symbols ?? []} scratchLevel={user.scratchLevel} prizeTier={activeTicket.prizeTier} initialSnapshot={scratchSnapshots[activeTicket.id]} onSnapshot={(snapshot) => rememberScratchSnapshot(activeTicket.id, snapshot)} onProgress={(progress) => rememberScratchProgress(activeTicket.id, progress)} onComplete={() => void completeScratch(activeTicket.id)} />
             ) : (
@@ -1284,6 +1285,52 @@ function ResultSymbols({ cardCode, cardName, symbols, prizeTier = 'none' }: { ca
           style={{ left: `${cell.x / 7.2}%`, top: `${cell.y / stageHeight * 100}%`, width: `${cell.width / 7.2}%`, height: `${cell.height / stageHeight * 100}%` }}
         ><TicketSymbolGlyph cardCode={cardCode} symbol={symbol} /><small>{symbol.replace('目标·', '目标：')}</small></strong>
       })}</div>
+    </div>
+  )
+}
+
+const ticketPrizeGuides: Record<string, { label: string; value: string; jackpot?: boolean }[]> = {
+  'lingqian-ticket': [
+    { label: '狗头金币', value: '25 / 三同50' }, { label: '钞票', value: '50 / 三同100' },
+    { label: '碎钻石', value: '60 / 三同120' }, { label: '钞票堆', value: '75 / 头奖150', jackpot: true },
+  ],
+  'street-store': [
+    { label: '辣条', value: '750' }, { label: '可乐', value: '1,500' }, { label: '冰棍', value: '1,800' },
+    { label: '雪糕', value: '2,250' }, { label: '玩具车', value: '3,000' }, { label: '小电视', value: '3,750' },
+    { label: '游戏机', value: '头奖 4,500', jackpot: true },
+  ],
+  'arcade-challenge': [
+    { label: '弹珠', value: '2,500' }, { label: '拳套', value: '5,000' }, { label: '赛车', value: '6,500' },
+    { label: '飞机', value: '10,000' }, { label: '皇冠', value: '头奖 15,000', jackpot: true },
+  ],
+  'gold-mine': [
+    { label: '2个', value: '7,500' }, { label: '3个', value: '15,000' }, { label: '4个', value: '22,500' },
+    { label: '5个', value: '30,000' }, { label: '6个', value: '头奖 45,000', jackpot: true },
+  ],
+  'rocket-launch': [
+    { label: '4–5', value: '20,000' }, { label: '6–7', value: '40,000' }, { label: '8', value: '60,000' },
+    { label: '9–10', value: '80,000' }, { label: '11–12', value: '头奖 120,000', jackpot: true },
+  ],
+  'deep-sea-salvage': [
+    { label: '海草团', value: '40,000' }, { label: '破皮靴', value: '80,000' }, { label: '漂流瓶', value: '96,000' },
+    { label: '船锚', value: '120,000' }, { label: '珍珠贝', value: '160,000' }, { label: '宝箱', value: '200,000' },
+    { label: '王冠', value: '头奖 240,000', jackpot: true },
+  ],
+  'eternal-color-diamond': [
+    { label: '裂纹', value: '75,000' }, { label: '工业', value: '150,000' }, { label: '珠宝', value: '180,000' },
+    { label: '稀有', value: '225,000' }, { label: '精选', value: '240,000' }, { label: '典藏', value: '300,000' },
+    { label: '皇室', value: '375,000' }, { label: '永恒', value: '头奖 450,000', jackpot: true },
+  ],
+}
+
+function TicketPrizeGuide({ cardCode }: { cardCode: string }) {
+  const prizes = ticketPrizeGuides[cardCode]
+  if (!prizes) return null
+  return (
+    <div className={`ticket-prize-guide guide-${cardCode} count-${prizes.length}`} aria-label="本卡奖级">
+      {prizes.map((prize) => <span className={prize.jackpot ? 'jackpot' : ''} key={prize.label}>
+        <small>{prize.label}</small><strong>{prize.value}</strong>
+      </span>)}
     </div>
   )
 }

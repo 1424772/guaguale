@@ -1613,6 +1613,24 @@ html, body, #root { width: 100%; height: 100%; margin: 0; overflow: hidden; }
   filter: contrast(1.025) saturate(.98);
 }
 .scratch-zoom-layer { position: absolute; inset: 0; display: block; padding: 0; background: transparent; }
+.ticket-prize-guide { position: absolute; z-index: 8; left: 3%; right: 3%; bottom: 2.6%; min-height: 12%; display: grid; align-items: stretch; overflow: hidden; border: 1px solid rgba(234,205,133,.7); border-radius: 7px; color: #f8e5b0; background: linear-gradient(180deg, rgba(18,27,29,.96), rgba(5,13,16,.98)); box-shadow: inset 0 1px rgba(255,255,255,.13); pointer-events: none; }
+.ticket-prize-guide.count-4 { grid-template-columns: repeat(4, 1fr); }
+.ticket-prize-guide.count-5 { grid-template-columns: repeat(5, 1fr); }
+.ticket-prize-guide.count-7 { grid-template-columns: repeat(7, 1fr); }
+.ticket-prize-guide.count-8 { grid-template-columns: repeat(8, 1fr); }
+.ticket-prize-guide > span { display: grid; place-content: center; min-width: 0; padding: 3px 2px; border-right: 1px solid rgba(232,204,137,.28); text-align: center; }
+.ticket-prize-guide > span:last-child { border-right: 0; }
+.ticket-prize-guide small, .ticket-prize-guide strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ticket-prize-guide small { color: inherit; font: 700 clamp(7px,.72vw,11px)/1.1 "Songti SC", serif; opacity: .8; }
+.ticket-prize-guide strong { margin-top: 2px; font: 900 clamp(8px,.92vw,14px)/1.05 Georgia, "Songti SC", serif; }
+.ticket-prize-guide .jackpot { color: #fff2a4; background: radial-gradient(circle at 50% 30%, rgba(255,210,75,.24), transparent 68%); }
+.guide-lingqian-ticket { left: 8%; right: 8%; bottom: 3.2%; min-height: 15%; border-color: rgba(65,88,66,.76); color: #243d2e; background: linear-gradient(180deg, rgba(224,213,169,.98), rgba(180,192,151,.98)); }
+.guide-street-store { left: 4.4%; right: 4.4%; bottom: 3.5%; min-height: 13.5%; border-color: #bc4c35; color: #4d251d; background: linear-gradient(180deg, rgba(250,222,165,.98), rgba(230,177,108,.98)); }
+.guide-arcade-challenge { left: 3.5%; right: 3.5%; bottom: 3.8%; min-height: 13%; border-color: #3a8ef0; color: #eaf6ff; background: linear-gradient(90deg, rgba(8,24,58,.98), rgba(25,10,55,.98)); }
+.guide-gold-mine { left: 3.2%; right: 3.2%; bottom: 3%; min-height: 13%; border-color: #c88b2b; color: #ffdc77; background: linear-gradient(180deg, rgba(53,38,22,.98), rgba(22,17,13,.98)); }
+.guide-rocket-launch { left: 3%; right: 3%; bottom: 3.2%; min-height: 13%; border-color: #627995; color: #eff6ff; background: linear-gradient(180deg, rgba(20,35,56,.98), rgba(7,18,35,.98)); }
+.guide-deep-sea-salvage { left: 3%; right: 3%; bottom: 3.4%; min-height: 12.5%; border-color: #b18a47; color: #e7d3a0; background: linear-gradient(180deg, rgba(13,43,52,.98), rgba(5,24,31,.98)); }
+.guide-eternal-color-diamond { left: 3.2%; right: 3.2%; bottom: 3.5%; min-height: 12.5%; border-color: #ddd0f4; color: #f7f1ff; background: linear-gradient(180deg, rgba(57,56,83,.97), rgba(31,31,52,.98)); }
 .scratch-dialog .scratch-card { position: absolute; inset: 0; display: block; }
 .scratch-dialog .scratch-stage {
   position: absolute;
